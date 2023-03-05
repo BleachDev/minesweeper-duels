@@ -86,7 +86,7 @@
         <label for="username-join">Username</label>
         <input type="text" id="username-join" name="username-join">
 
-        <button id="join-game-button" disabled="true">Join Game</button>
+        <button id="join-game-button" disabled="disabled">Join Game</button>
         <div class="left-box">
             <button onclick="exitToMenu();"><-</button>
         </div>
@@ -116,7 +116,7 @@
             <button onclick="exitToMenu();"><-</button>
         </div>
         <div class="right-box">
-            <button onclick="serverCon.send([255, -1, 'Gave Up']);">Give Up</button>
+            <button onclick="giveUp();">Give Up</button>
         </div>
     </div>
 
@@ -173,7 +173,7 @@
             const code = urlParams.get("code");
             openWindow("join-window");
             document.getElementById("join-game-header").innerText = "Join Game " + code;
-            document.getElementById("join-game-button").onclick = e => joinGame(code, document.getElementById("username-join").value);
+            document.getElementById("join-game-button").onclick = () => joinGame(code, document.getElementById("username-join").value);
 
             const metadataPeer = new peerjs.Peer();
             metadataPeer.on('open', id => {
@@ -215,7 +215,7 @@
                 clientAcceptor.on('connection', clientCon => {
                     console.log("Client Accepted", clientCon);
 
-                    if (players.length == 2) {
+                    if (players.length === 2) {
                         document.getElementById("field-overlay").style.visibility = "hidden";
                     }
 
@@ -373,8 +373,8 @@
                 for (let x = 0; x < fieldWidth; x++) {
                     const cell = document.createElement('td');
                     cell.className = 'hidden';
-                    cell.onclick = e => reveal(y * fieldWidth + x, cell);
-                    cell.oncontextmenu = e => flag(y * fieldWidth + x, cell);
+                    cell.onclick = () => reveal(y * fieldWidth + x, cell);
+                    cell.oncontextmenu = () => flag(y * fieldWidth + x, cell);
                     row.appendChild(cell);
                 }
 
@@ -412,7 +412,7 @@
         }
 
         function reveal(pos, cell) {
-            if (yourIndex != turnIndex) {
+            if (yourIndex !== turnIndex) {
                 return;
             }
 
@@ -435,13 +435,13 @@
         }
 
         function revealInternal(pos, cell) {
-            if (cell.className == "revealed") {
+            if (cell.className === "revealed") {
                 return;
             }
 
             cell.className = "revealed";
-            cell.onclick = e => false;
-            cell.oncontextmenu = e => false;
+            cell.onclick = () => false;
+            cell.oncontextmenu = () => false;
 
             const nearby = field[pos] & 15;
             field[pos] = nearby;
@@ -472,6 +472,12 @@
             document.getElementById("player-timer-1").style.color = turnIndex ? "var(--p1-color)" : "white";
             document.getElementById("player-name-2").style.color = turnIndex ? "white" : "var(--p2-color)";
             document.getElementById("player-timer-2").style.color = turnIndex ? "white" : "var(--p2-color)";
+        }
+
+        function giveUp() {
+            if (document.getElementById("field-overlay").style.visibility === "hidden") {
+                serverCon.send([255, -1, "Gave Up"]);
+            }
         }
 
         function endGame(pos, message) {
