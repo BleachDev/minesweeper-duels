@@ -3,9 +3,19 @@
     --p2-color: #ff6c6c;
 }
 
-/** {
-    outline: 1px solid #c080ff40;
-}*/
+/* Bottom right */
+.bottom-right {
+    padding: 4px 12px;
+    position: absolute;
+    top: 100%;
+    left: 100%;
+    transform: translate(-100%, -100%);
+}
+
+.color-link {
+    filter: grayscale(1) brightness(70%);
+    -webkit-filter: grayscale(1) brightness(70%);
+}
 
 /* Main menu */
 #main-window {
