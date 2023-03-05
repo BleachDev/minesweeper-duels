@@ -85,14 +85,21 @@ input[type="range"] {
     float: right;
 }
 
-#rules-text {
+.right-text {
     position: absolute;
     text-align: left;
-    left: 101%;
-    top: calc(100% - 100px);
+    left: calc(100% + 7px);
     white-space: nowrap;
-    color: #bbb;
     line-height: 21px;
+}
+
+#rules-text {
+    color: #bbb;
+    top: calc(100% - 100px);
+}
+
+#spectators-text {
+    color: var(--header-color);
 }
 
 #player-name-1, #player-timer-1 {

@@ -26,6 +26,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <!--script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script-->
     <script src="words.js"></script>
 </head>
 <body>
@@ -111,7 +112,8 @@
         <div style="height: 60px;"></div>
 
         <div style="position: relative;">
-            <p id="rules-text"></p>
+            <p class="right-text" id="rules-text"></p>
+            <p class="right-text" id="spectators-text"></p>
             <div id="field-overlay">
                 <p id="overlay-message">Placeholder</p>
             </div>
@@ -288,6 +290,7 @@
                             if (data[2] >= 0) {
                                 getCell(data[2]).className = data[1] ? "revealed-p2" : "revealed-p1";
                             }
+
                             updateTurn();
 
                             clearInterval(timerFunc);
@@ -340,6 +343,9 @@
                             if (players.length >= 2) {
                                 document.getElementById("player-name-2").innerText = players[1];
                                 document.getElementById("field-overlay").style.visibility = "hidden";
+                                if (players.length >= 3) {
+                                    document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
+                                }
                             }
                             updateTurn();
                         } else if (data[0] === 255) {
