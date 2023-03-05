@@ -49,7 +49,7 @@
             </a>
         </div>
         <div class="bottom-left">
-            <p style="text-align: left; margin: 0;">Controls:<br>
+            <p class="bottom-left-text">Controls:<br>
                 <b>LMB</b> Reveal Square<br>
                 <b>RMB</b> Flag Square<br>
                 <b>MMB</b> <a href="https://minesweepergame.com/website/authoritative-minesweeper/wiki/Chord">Chord</a> Square</p>
@@ -310,7 +310,7 @@
                                         cl.send([255, -1, `Board Finished!\nIncreasing difficulty`]);
                                     }
 
-                                    let countdown = 5;
+                                    let countdown = 7;
                                     const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.6 ? ~~((Math.random() + 0.35) * 3) : 0);
                                     const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2000 : 1000), 0);
                                     const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";

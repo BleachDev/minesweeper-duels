@@ -19,6 +19,12 @@
     transform: translate(0, -100%);
 }
 
+.bottom-left-text {
+    text-align: left;
+    margin: 0;
+    color: #bbb;
+}
+
 .color-link {
     filter: grayscale(1) brightness(70%);
     -webkit-filter: grayscale(1) brightness(70%);
