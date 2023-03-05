@@ -72,7 +72,7 @@
         <label for="username-create">Username</label>
         <input type="text" id="username-create" name="username-create">
 
-        <button onclick="newGame(document.getElementById('username-create').value);">Create Game</button>
+        <button onclick="newGame(getAndSaveUsername('username-create'));">Create Game</button>
         <div class="left-box">
             <button onclick="exitToMenu();"><-</button>
         </div>
@@ -181,7 +181,7 @@
             const code = urlParams.get("code");
             openWindow("join-window");
             document.getElementById("join-game-header").innerText = "Join Game " + code;
-            document.getElementById("join-game-button").onclick = () => joinGame(code, document.getElementById("username-join").value);
+            document.getElementById("join-game-button").onclick = () => joinGame(code, getAndSaveUsername("username-join"));
 
             const metadataPeer = new peerjs.Peer();
             metadataPeer.on('open', id => {
@@ -204,9 +204,11 @@
             });
         }
 
-        const generatedUsername = words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
+
+        const username = document.cookie.split("; ").find(row => row.startsWith("username="))?.split("=")[1]
+            ?? words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
         [ "username", "username-create", "username-join" ].forEach(u => {
-            document.getElementById(u).value = generatedUsername;
+            document.getElementById(u).value = username;
         });
 
         function newGame(username) {
@@ -590,6 +592,12 @@
             for (const w of WINDOWS) {
                 document.getElementById(w).style.display = windowName === w ? "inline-block" : "none";
             }
+        }
+
+        function getAndSaveUsername(id) {
+            const name = document.getElementById(id).value;
+            document.cookie = "username=" + name + "; max-age=2592000";
+            return name;
         }
     </script>
 </body>
