@@ -417,6 +417,31 @@
             return false;
         }
 
+        function chord(pos, cell) {
+            if (yourIndex !== turnIndex) {
+                return;
+            }
+
+            const flags = getAdjacent(pos).filter(c => getCell(c).innerText === "F");
+            const open = getAdjacent(pos).filter(c => field[c] >= 16 && flags.indexOf(c) === -1);
+            if (flags.length === field[pos] & 15 && open.length > 0) {
+                for (const c of open) {
+                    if (field[c] === 25) {
+                        serverCon.send([255, c, "Detonated a bomb"]);
+                        return;
+                    } else {
+                        revealInternal(c, getCell(c));
+                    }
+                }
+
+                serverCon.send(field);
+                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + timeIncrement ]);
+
+                turnIndex = turnIndex ? 0 : 1;
+                updateTurn();
+            }
+        }
+
         function reveal(pos, cell) {
             if (yourIndex !== turnIndex) {
                 return;
@@ -448,6 +473,7 @@
             cell.className = "revealed";
             cell.onclick = () => false;
             cell.oncontextmenu = () => false;
+            cell.onauxclick = () => chord(pos, cell);
 
             const nearby = field[pos] & 15;
             field[pos] = nearby;
