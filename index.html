@@ -366,6 +366,7 @@
                     window.history.pushState({ path: path }, '', path);
 
                     document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
+                    document.getElementById("spectators-text").innerHTML = "";
 
                     serverCon.send([ 252 ]);
                     serverCon.send([ 254, username ]);
