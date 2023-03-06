@@ -59,19 +59,19 @@
     <div class="box" id="create-window">
         <h1>Create New Game</h1>
 
-        <p class="setting-label" id="board-label">Board Size: 12x16</p>
-        <input type="range" id="board-size" name="board-size" min="11" max="35" value="16" list="board-default">
+        <p class="setting-label" id="board-label">Board Size:</p>
+        <input type="range" id="board-size" name="board-size" min="12" max="35" value="16" list="board-default">
         <datalist id="board-default"><option value="16"></option></datalist>
 
-        <p class="setting-label" id="mine-label">Mines: 15%</p>
+        <p class="setting-label" id="mine-label">Mines:</p>
         <input type="range" id="mine-count" name="mine-count" min="5" max="30" value="15" list="mine-default">
         <datalist id="mine-default"><option value="15"></option></datalist>
 
-        <p class="setting-label" id="time-label">Time: 1:00</p>
+        <p class="setting-label" id="time-label">Time:</p>
         <input type="range" id="time" name="time" min="2" max="600" value="60" step="2" list="time-default">
         <datalist id="time-default"><option value="60"></option></datalist>
 
-        <p class="setting-label" id="increment-label">Time Increment: +2s</p>
+        <p class="setting-label" id="increment-label">Time Increment:</p>
         <input type="range" id="increment" name="increment" min="0" max="10" value="2" list="increment-default">
         <datalist id="increment-default"><option value="2"></option></datalist>
 
@@ -130,6 +130,7 @@
             <button onclick="exitToMenu();"><-</button>
         </div>
         <div class="right-box">
+            <button onclick="serverCon.send([ 251 ]);" disabled="disabled" id="rematch-button">Rematch</button>
             <button onclick="giveUp();">Give Up</button>
         </div>
     </div>
@@ -147,7 +148,9 @@
         let minePercentage;
 
         // Networking things, Packets:
-        // 0-251 >< Field update [cell1, cell2.. cellmax]
+        // 0-250 >< Field update [cell1, cell2.. cellmax]
+        // 251 < Open Rematches [251]
+        //     > Request Rematch [251]
         // 252 > Request Game Info [252]
         //     < Game Info [252, boardSize, mineCount, time, increment]
         // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
@@ -161,26 +164,26 @@
 
         let players = [];
         let timers = [];
+        let rematches = [];
         let yourIndex;
         let turnIndex = 0;
 
         let timerFunc;
         let timeIncrement;
 
-        [ "input", "load" ].forEach(t => {
-            document.getElementById("board-size").addEventListener(t, e => {
-                document.getElementById('board-label').innerText = `Board Size: ${~~(e.target.value / 1.3)}x${e.target.value}`;
-            });
-            document.getElementById("mine-count").addEventListener(t, e => {
-                document.getElementById('mine-label').innerText = `Mines: ${e.target.value}%`;
-            });
-            document.getElementById("time").addEventListener(t, e => {
-                document.getElementById('time-label').innerText = `Time: ${formatTimeS(e.target.value)}`;
-            });
-            document.getElementById("increment").addEventListener(t, e => {
-                document.getElementById('increment-label').innerText = `Time Increment: +${e.target.value}s`;
-            });
+        document.getElementById("board-size").addEventListener("input", e => {
+            document.getElementById('board-label').innerText = `Board Size: ${~~(e.target.value / 1.3)}x${e.target.value}`;
         });
+        document.getElementById("mine-count").addEventListener("input", e => {
+            document.getElementById('mine-label').innerText = `Mines: ${e.target.value}%`;
+        });
+        document.getElementById("time").addEventListener("input", e => {
+            document.getElementById('time-label').innerText = `Time: ${formatTimeS(e.target.value)}`;
+        });
+        document.getElementById("increment").addEventListener("input", e => {
+            document.getElementById('increment-label').innerText = `Time Increment: +${e.target.value}s`;
+        });
+        [ "board-size", "mine-count", "time", "increment" ].forEach(e => document.getElementById(e).dispatchEvent(new Event('input')));
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("code")) {
@@ -237,7 +240,22 @@
 
                     clientCon.on('data', data => {
                         console.log("Server Received", data);
-                        if (data[0] === 252) {
+                        if (data[0] === 251) {
+                            const clIndex = clients.indexOf(clientCon);
+                            if (rematches.indexOf(clIndex) !== -1) {
+                                return;
+                            }
+
+                            rematches.push(clIndex);
+                            if (rematches.indexOf(0) !== -1 && rematches.indexOf(1) !== -1) {
+                                restartBoard("Rematching!\n", document.getElementById("mine-count").value,
+                                    document.getElementById("time").value, document.getElementById("increment").value);
+                            } else {
+                                for (const cl of clients) {
+                                    cl.send([ 255, -1, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch" ]);
+                                }
+                            }
+                        } else if (data[0] === 252) {
                             clientCon.send([ 252,
                                 document.getElementById("board-size").value, document.getElementById("mine-count").value,
                                 document.getElementById("time").value,  document.getElementById("increment").value ]);
@@ -256,6 +274,7 @@
                             const altData = [ 255, data[1], `You Lost!\nYou ${data[2]}`];
                             for (const cl of clients) {
                                 cl.send(cl === clientCon ? altData : newData);
+                                cl.send([ 251 ]);
                             }
                         } else {
                             for (const cl of clients) {
@@ -279,7 +298,9 @@
                 serverCon.on('open', () => {
                     serverCon.on('data', data => {
                         console.log("Client Received", data);
-                        if (data[0] === 252) {
+                        if (data[0] === 251) {
+                            document.getElementById("rematch-button").disabled = "";
+                        } else if (data[0] === 252) {
                             fieldWidth = ~~(data[1] / 1.3);
                             fieldHeight = +data[1];
                             minePercentage = +data[2];
@@ -306,30 +327,11 @@
                             // If every square in the field has been revealed
                             if (field.filter(c => c <= 8 || c === 25).length === field.length) {
                                 if (clients.length !== 0) {
-                                    for (const cl of clients) {
-                                        cl.send([255, -1, `Board Finished!\nIncreasing difficulty`]);
-                                    }
-
-                                    let countdown = 7;
                                     const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.6 ? ~~((Math.random() + 0.35) * 3) : 0);
                                     const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2000 : 1000), 0);
                                     const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
-                                    const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement / 1000}s -> ⧖ +${newIncrement / 1000}s\n` : ""
-                                    let countdownFunc = setInterval(() => {
-                                        if (countdown > 0) {
-                                            for (const cl of clients) {
-                                                cl.send([255, -1, `Board Finished!\nIncreasing difficulty\n\n${newMineText}${newIncrementText}${countdown}..`]);
-                                            }
-                                        } else {
-                                            console.log(timeIncrement / 1000, (timeIncrement / 1000) - 1);
-                                            for (let i = 0; i < clients.length; i++) {
-                                                clients[i].send([ 252, fieldHeight, newMines, -1, newIncrement / 1000 ]);
-                                                clients[i].send([254, i].concat(players));
-                                            }
-                                            clearInterval(countdownFunc);
-                                        }
-                                        countdown--;
-                                    }, 1000);
+                                    const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement / 1000}s -> ⧖ +${newIncrement / 1000}s\n` : "";
+                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newIncrementText}`, newMines, -1, newIncrement / 1000);
                                 }
                             } else {
                                 let lastMs;
@@ -351,6 +353,8 @@
                             if (players.length >= 2) {
                                 document.getElementById("player-name-2").innerText = players[1];
                                 document.getElementById("field-overlay").style.visibility = "hidden";
+                                document.getElementById("rematch-button").disabled = "disabled";
+                                rematches = [];
                                 if (players.length >= 3) {
                                     document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
                                 }
@@ -380,6 +384,29 @@
                     serverCon.send([ 254, username ]);
                 });
             });
+        }
+
+        function restartBoard(text, newMines, newTime, newIncrement) {
+            for (const cl of clients) {
+                cl.send([255, -1, text]);
+            }
+
+            let countdown = 6;
+            let countdownFunc = setInterval(() => {
+                if (countdown > 0) {
+                    for (const cl of clients) {
+                        cl.send([255, -1, text + "\n" + countdown + ".."]);
+                    }
+                } else {
+                    console.log(timeIncrement / 1000, (timeIncrement / 1000) - 1);
+                    for (let i = 0; i < clients.length; i++) {
+                        clients[i].send([ 252, fieldHeight, newMines, newTime, newIncrement ]);
+                        clients[i].send([ 254, i ].concat(players));
+                    }
+                    clearInterval(countdownFunc);
+                }
+                countdown--;
+            }, 1000);
         }
 
         function createField() {
@@ -568,6 +595,7 @@
             document.getElementById("field-overlay").style.visibility = "visible";
             document.getElementById("player-name-1").innerText = "---";
             document.getElementById("player-name-2").innerText = "---";
+            document.getElementById("rematch-button").disabled = "disabled";
 
             const path = window.location.protocol + "//" + window.location.host + window.location.pathname;
             window.history.pushState({ path: path }, '', path);
@@ -578,6 +606,7 @@
             clients = [];
             players = [];
             timers = [];
+            rematches = [];
             yourIndex = 0;
             turnIndex = 0;
         }
