@@ -1,6 +1,8 @@
 :root {
     --p1-color: #7878ff;
     --p2-color: #ff6c6c;
+    --p1-color-dark: #4b4ba1;
+    --p2-color-dark: #8f3d3d;
 }
 
 .bottom-right {
@@ -142,6 +144,10 @@ input[type="range"] {
 #field {
     border-collapse: collapse;
     font-size: 20px;
+    user-select: none;
+}
+
+#field p {
 }
 
 td {
