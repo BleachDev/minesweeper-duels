@@ -147,9 +147,6 @@ input[type="range"] {
     user-select: none;
 }
 
-#field p {
-}
-
 td {
     width: 25px;
     min-width: 25px;
