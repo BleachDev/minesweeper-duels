@@ -270,6 +270,10 @@
                                 clients[i].send([254, i].concat(players));
                             }
                         } else if (data[0] === 255) {
+                            if (clients.indexOf(clientCon) > 1) {
+                                return;
+                            }
+
                             const newData = [ 255, data[1], `You Won!\n${players[clients.indexOf(clientCon)]} ${data[2]}`];
                             const altData = [ 255, data[1], `You Lost!\nYou ${data[2]}`];
                             for (const cl of clients) {
