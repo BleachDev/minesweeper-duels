@@ -26,7 +26,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    <!--script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script-->
+    <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
     <script src="words.js"></script>
 </head>
 <body>
@@ -115,16 +115,17 @@
             <h3 class="player-text" id="player-timer-2">00:00.00</h3>
         </div>
 
-        <div style="height: 60px;"></div>
+        <div style="height: 53px;"></div>
 
         <div style="position: relative;">
-            <p class="right-text" id="rules-text"></p>
-            <p class="right-text" id="spectators-text"></p>
             <div id="field-overlay">
                 <p id="overlay-message">Placeholder</p>
             </div>
             <table id="field"></table>
         </div>
+
+        <p class="right-text" id="rules-text"></p>
+        <p class="right-text" id="spectators-text"></p>
 
         <div class="left-box">
             <button onclick="exitToMenu();"><-</button>
@@ -137,6 +138,7 @@
 
     <script>
         const WINDOWS = [ "main-window", "create-window", "join-window", "field-window" ];
+        const synth = new Tone.Synth().toDestination();
 
         let fieldWidth;
         let fieldHeight;
@@ -171,6 +173,7 @@
         let timerFunc;
         let timeIncrement;
 
+        // Init things
         document.getElementById("board-size").addEventListener("input", e => {
             document.getElementById('board-label').innerText = `Board Size: ${~~(e.target.value / 1.3)}x${e.target.value}`;
         });
@@ -325,6 +328,7 @@
                             }
 
                             updateTurn();
+                            synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", Tone.now(), 0.3);
 
                             clearInterval(timerFunc);
                             updateTimer(data[1], data[3]);
@@ -550,6 +554,7 @@
             document.getElementById("player-timer-1").style.color = turnIndex ? "var(--p1-color)" : "white";
             document.getElementById("player-name-2").style.color = turnIndex ? "white" : "var(--p2-color)";
             document.getElementById("player-timer-2").style.color = turnIndex ? "white" : "var(--p2-color)";
+            document.getElementById("field").style.border = turnIndex ? "2px solid var(--p2-color)" : "2px solid var(--p1-color)";
         }
 
         function giveUp() {
@@ -561,6 +566,8 @@
         function endGame(pos, message) {
             if (pos >= 0 && pos < field.length) {
                 getCell(pos).style.backgroundColor = turnIndex ? "var(--p2-color)" : "var(--p1-color)";
+                synth.triggerAttackRelease("G2", "4n", Tone.now(), 0.5);
+
                 for (let i = 0; i < field.length; i++) {
                     if (field[i] === 25) {
                         revealInternal(i, getCell(i));
