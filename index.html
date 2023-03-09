@@ -149,9 +149,10 @@
         let minePercentage;
 
         // Networking things, Packets:
-        // 0-250 >< Field update [cell1, cell2.. cellmax]
+        // 0-220 >< Field update [cell1, cell2.. cellmax]
         // 251 < Open Rematches [251]
         //     > Request Rematch [251]
+        //     < Start Rematch [251, 1]
         // 252 > Request Game Info [252]
         //     < Game Info [252, boardSize, mineCount, time, increment]
         // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
@@ -236,10 +237,6 @@
                 clientAcceptor.on('connection', clientCon => {
                     console.log("Client Accepted", clientCon);
 
-                    if (players.length === 2) {
-                        document.getElementById("field-overlay").style.visibility = "hidden";
-                    }
-
                     clientCon.on('data', data => {
                         console.log("Server Received", data);
                         if (data[0] === 251) {
@@ -318,6 +315,11 @@
                         console.log("Client Received", data);
                         if (data[0] === 251) {
                             document.getElementById("rematch-button").disabled = "";
+                            if (data[1] === 1) {
+                                document.getElementById("field-overlay").style.visibility = "hidden";
+                                document.getElementById("rematch-button").disabled = "disabled";
+                                rematches = [];
+                            }
                         } else if (data[0] === 252) {
                             fieldWidth = ~~(data[1] / 1.3);
                             fieldHeight = +data[1];
@@ -368,15 +370,14 @@
                         } else if (data[0] === 254) {
                             yourIndex = data[1];
                             players = data.slice(2);
+
                             document.getElementById("player-name-1").innerText = players[0];
-                            if (players.length >= 2) {
-                                document.getElementById("player-name-2").innerText = players[1];
+                            document.getElementById("player-name-2").innerText = players[1] ?? "---";
+                            if (players.length === 2) {
                                 document.getElementById("field-overlay").style.visibility = "hidden";
-                                document.getElementById("rematch-button").disabled = "disabled";
-                                rematches = [];
-                                if (players.length >= 3) {
-                                    document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
-                                }
+                            }
+                            if (players.length >= 3) {
+                                document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
                             }
                             updateTurn();
                         } else if (data[0] === 255) {
@@ -420,7 +421,7 @@
                     console.log(timeIncrement / 1000, (timeIncrement / 1000) - 1);
                     for (let i = 0; i < clients.length; i++) {
                         clients[i].send([ 252, fieldHeight, newMines, newTime, newIncrement ]);
-                        clients[i].send([ 254, i ].concat(players));
+                        clients[i].send([ 251, 1 ]);
                     }
                     clearInterval(countdownFunc);
                 }
