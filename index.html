@@ -284,7 +284,7 @@
                             }
                         } else {
                             for (let i = 0; i < data; i++) {
-                                if (data[i] === 15) {
+                                if (data[i] === 9) {
                                     const newData = [ 255, data[1], `You Won!\n${players[clients.indexOf(clientCon)]} Did an illegal turn?`];
                                     const altData = [ 255, data[1], `You Lost!\nYou Did an illegal turn?`];
                                     for (const cl of clients) {
