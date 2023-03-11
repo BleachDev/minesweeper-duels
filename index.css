@@ -59,7 +59,7 @@
 }
 
 #leaderboard {
-    max-width: 325px;
+    max-width: 350px;
     height: 270px;
     padding: 7px 10px;
     margin: auto auto 5px;
@@ -106,7 +106,7 @@ input[type="range"] {
 
 /* Join Menu */
 #join-window {
-    max-width: 350px;
+    max-width: 370px;
     margin: auto;
     display: none;
 }
