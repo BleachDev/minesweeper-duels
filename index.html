@@ -43,24 +43,12 @@
 
             <label for="username">Username</label>
             <input type="text" id="username" name="username">
-
-            <div class="bottom-right">
-                <a class="color-link" href="https://github.com/BleachDev/minesweeper-duels">
-                    <img src="https://bleach.dev/static/img/logos/github.svg" alt="Github" width="32"/>
-                </a>
-            </div>
-            <div class="bottom-left">
-                <p class="bottom-left-text">Controls:<br>
-                    <b>LMB</b> Reveal Square<br>
-                    <b>RMB</b> Flag Square<br>
-                    <b>MMB</b> <a href="https://minesweepergame.com/website/authoritative-minesweeper/wiki/Chord">Chord</a> Square</p>
-            </div>
         </div>
 
         <div style="height: 10px;"></div>
 
         <details>
-            <summary style="margin-bottom: 5px; text-align: left; margin-left: 25px;">Leaderboard</summary>
+            <summary style="margin-bottom: 5px;">Leaderboard</summary>
             <div class="box" id="leaderboard">
                 <div>Loading..</div>
             </div>
@@ -143,6 +131,20 @@
         <div class="right-box">
             <button onclick="serverCon.send([ 251 ]);" disabled="disabled" id="rematch-button">Rematch</button>
             <button onclick="giveUp();">Give Up</button>
+        </div>
+    </div>
+
+    <div id="corner-information">
+        <div class="bottom-right">
+            <a class="color-link" href="https://github.com/BleachDev/minesweeper-duels">
+                <img src="https://bleach.dev/static/img/logos/github.svg" alt="Github" width="32"/>
+            </a>
+        </div>
+        <div class="bottom-left">
+            <p class="bottom-left-text">Controls:<br>
+                <b>LMB</b> Reveal Square<br>
+                <b>RMB</b> Flag Square<br>
+                <b>MMB</b> <a href="https://minesweepergame.com/website/authoritative-minesweeper/wiki/Chord">Chord</a> Square</p>
         </div>
     </div>
 
@@ -615,8 +617,8 @@
                 return;
             }
 
-            if (player === yourIndex && timers[player] <= 3000 && (timers[player] % 200) < (ms % 200)) {
-                synth.triggerAttackRelease("A5", "32n", undefined, 0.03);
+            if (player === yourIndex && timers[player] <= 3500 && (timers[player] % 200) < (ms % 200)) {
+                synth.triggerAttackRelease("A5", "32n", undefined, 0.05);
             }
 
             document.getElementById(player ? "player-timer-2" : "player-timer-1").innerText = formatTime(ms);
@@ -669,6 +671,7 @@
         }
 
         function openWindow(windowName) {
+            document.getElementById("corner-information").style.display = (windowName === "field-window" ? "none" : "block");
             for (const w of WINDOWS) {
                 document.getElementById(w).style.display = windowName === w ? "block" : "none";
             }
