@@ -67,7 +67,7 @@
         <datalist id="mine-default"><option value="15"></option></datalist>
 
         <p class="setting-label" id="time-label">Time:</p>
-        <input type="range" id="time" name="time" min="2" max="600" value="60" step="2" list="time-default">
+        <input type="range" id="time" name="time" min="2" max="300" value="60" step="2" list="time-default">
         <datalist id="time-default"><option value="60"></option></datalist>
 
         <p class="setting-label" id="increment-label">Time Increment:</p>
@@ -84,7 +84,7 @@
     </div>
 
     <div class="box" id="join-window">
-        <h2 id="join-game-header">Join Game</h2>
+        <h2 id="join-game-header">Loading..</h2>
         <div style="width: fit-content; margin: auto;">
             <p style="margin-bottom: 2px;">Rules:</p>
             <p id="join-rules-text">
@@ -167,11 +167,9 @@
         //     > Request Rematch [251]
         //     < Start Rematch [251, 1]
         // 252 > Request Game Info [252]
-        //     < Game Info [252, boardSize, mineCount, time, increment]
+        //     > Join Game [252, "username"]
+        //     < Game Info [252, boardSize, mineCount, time, increment, yourIndex, "player1", "player2"..]
         // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
-        // 254 > Join Game [254, "username"]
-        //     > Request Player List [254]
-        //     < Player List [254, you, "player1", "player2".. ]
         // 255 > End game [255, "message", bombPos]
         //     < Show message [255, "message", bombPos, losingPlayer]
         let serverCon;
@@ -219,8 +217,6 @@
         if (urlParams.has("code")) {
             const code = urlParams.get("code");
             openWindow("join-window");
-            document.getElementById("join-game-header").innerText = "Join Game " + code;
-            document.getElementById("join-game-button").onclick = () => joinGame(code, getAndSaveUsername("username-join"));
 
             const metadataPeer = new peerjs.Peer();
             metadataPeer.on('open', id => {
@@ -236,6 +232,17 @@
                             .replace("\.\.\.", formatTimeS(data[3]))
                             .replace("\.\.\.", `+${data[4]}s`);
                         document.getElementById("join-game-button").disabled = "";
+
+                        document.getElementById("join-game-header").innerHTML =
+                            "<span style='color: var(--p1-color-light);'>" + data[6] +
+                            "</span>&nbsp;vs&nbsp;<span style='color: var(--p2-color-light);'>" +
+                            (data[7] ?? "<u>You!</u>") + "</span>";
+
+                        document.getElementById("join-game-button").onclick = () => joinGame(code, getAndSaveUsername("username-join"));
+                        if (data.length >= 8) {
+                            document.getElementById("join-game-button").innerText = "Spectate Game";
+                        }
+
                         metadataPeer.destroy();
                     });
                     metadataCon.send([ 252 ]);
@@ -266,7 +273,7 @@
 
                     clientCon.on('data', data => {
                         console.log("Server Received", data);
-                        const clIndex = clients.indexOf(clientCon);
+                        let clIndex = clients.indexOf(clientCon);
                         if (data[0] === 251) {
                             if (rematches.indexOf(clIndex) !== -1) {
                                 return;
@@ -282,19 +289,18 @@
                                 }
                             }
                         } else if (data[0] === 252) {
-                            clientCon.send([ 252,
-                                document.getElementById("board-size").value, document.getElementById("mine-count").value,
-                                document.getElementById("time").value,  document.getElementById("increment").value ]);
-                        } else if (data[0] === 254) {
                             if (data.length >= 2 && clIndex === -1) {
                                 console.log("Client Added To Game", clientCon);
-                                clients.push(clientCon);
+                                clIndex = clients.push(clientCon) - 1;
                                 players.push(data[1]);
+                                for (let i = 0; i < clients.length - 1; i++) {
+                                    clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players))
+                                }
                             }
 
-                            for (let i = 0; i < clients.length; i++) {
-                                clients[i].send([254, i].concat(players));
-                            }
+                            clientCon.send([ 252,
+                                +document.getElementById("board-size").value, +document.getElementById("mine-count").value,
+                                +document.getElementById("time").value,  +document.getElementById("increment").value, clIndex ].concat(players));
                         } else if (data[0] === 255) {
                             if (clIndex > 1) {
                                 return;
@@ -336,19 +342,36 @@
                                 rematches = [];
                             }
                         } else if (data[0] === 252) {
-                            fieldWidth = ~~(data[1] / 1.3);
-                            fieldHeight = +data[1];
-                            minePercentage = +data[2];
-                            createField();
+                            if (data[1] >= 0 && data[2] >= 0) {
+                                fieldWidth = ~~(data[1] / 1.3);
+                                fieldHeight = data[1];
+                                minePercentage = data[2];
+                                document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
+                                createField();
+                            }
 
-                            timeIncrement = data[4] * 1000;
+                            if (data[4] !== -1) {
+                                timeIncrement = data[4];
+                            }
                             if (data[3] >= 0) {
                                 updateTimer(0, 1000 * data[3]);
                                 updateTimer(1, 1000 * data[3]);
                             }
 
-                            document.getElementById("rules-text").innerText = `▦ ${fieldWidth}x${fieldHeight}\n✸ ${data[2]}%\n⧖ ${formatTimeS(data[3])}\n⧖ +${data[4]}s`;
-                            document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
+                            document.getElementById("rules-text").innerText = `▦ ${fieldWidth}x${fieldHeight}\n✸ ${minePercentage}%\n⧖ ${formatTimeS(data[3])}\n⧖ +${timeIncrement}s`;
+
+                            yourIndex = data[5];
+                            players = data.slice(6);
+
+                            document.getElementById("player-name-1").innerText = players[0];
+                            document.getElementById("player-name-2").innerText = players[1] ?? "---";
+                            if (players.length === 2) {
+                                document.getElementById("field-overlay").style.visibility = "hidden";
+                            }
+                            if (players.length >= 3) {
+                                document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
+                            }
+                            updateTurn();
                         } else if (data[0] === 253) {
                             turnIndex = data[1] ? 0 : 1;
                             if (data[2] >= 0) {
@@ -363,11 +386,11 @@
                             // If every square in the field has been revealed
                             if (field.filter(c => c <= 8 || c === 25).length === field.length) {
                                 if (clients.length !== 0) {
-                                    const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.6 ? ~~((Math.random() + 0.35) * 3) : 0);
-                                    const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2000 : 1000), 0);
+                                    const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.5 ? ~~((Math.random() + 0.35) * 3) : 0);
+                                    const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2 : 1), 0);
                                     const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
-                                    const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement / 1000}s -> ⧖ +${newIncrement / 1000}s\n` : "";
-                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newIncrementText}`, newMines, -1, newIncrement / 1000);
+                                    const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement}s -> ⧖ +${newIncrement}s\n` : "";
+                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newIncrementText}`, newMines, -1, newIncrement);
                                 }
                             } else {
                                 let lastMs;
@@ -382,19 +405,6 @@
                                     }
                                 }, 70);
                             }
-                        } else if (data[0] === 254) {
-                            yourIndex = data[1];
-                            players = data.slice(2);
-
-                            document.getElementById("player-name-1").innerText = players[0];
-                            document.getElementById("player-name-2").innerText = players[1] ?? "---";
-                            if (players.length === 2) {
-                                document.getElementById("field-overlay").style.visibility = "hidden";
-                            }
-                            if (players.length >= 3) {
-                                document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
-                            }
-                            updateTurn();
                         } else if (data[0] === 255) {
                             endGame(data[1], data[2], data[3]);
 
@@ -420,8 +430,7 @@
                     document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
                     document.getElementById("spectators-text").innerHTML = "";
 
-                    serverCon.send([ 252 ]);
-                    serverCon.send([ 254, username ]);
+                    serverCon.send([ 252, username ]);
                 });
             });
         }
@@ -438,9 +447,8 @@
                         cl.send([ 255, text + "\n" + countdown + "..", -1, -1 ]);
                     }
                 } else {
-                    console.log(timeIncrement / 1000, (timeIncrement / 1000) - 1);
                     for (let i = 0; i < clients.length; i++) {
-                        clients[i].send([ 252, fieldHeight, newMines, newTime, newIncrement ]);
+                        clients[i].send([ 252, fieldHeight, newMines, newTime, newIncrement, i ].concat(players));
                         clients[i].send([ 251, 1 ]);
                     }
                     clearInterval(countdownFunc);
@@ -517,7 +525,7 @@
                 }
 
                 serverCon.send(field);
-                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + timeIncrement ]);
+                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
 
                 turnIndex = turnIndex ? 0 : 1;
                 updateTurn();
@@ -540,7 +548,7 @@
                 revealInternal(pos, cell);
                 serverCon.send(field);
 
-                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + timeIncrement ]);
+                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
 
                 turnIndex = turnIndex ? 0 : 1;
                 updateTurn();

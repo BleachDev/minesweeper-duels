@@ -3,6 +3,8 @@
     --p2-color: #ff6c6c;
     --p1-color-dark: #4b4ba1;
     --p2-color-dark: #8f3d3d;
+    --p1-color-light: #a5a5fc;
+    --p2-color-light: #ff9e9e;
 }
 
 .bottom-right {
@@ -112,6 +114,12 @@ input[type="range"] {
 #join-rules-text {
     margin-top: 0;
     text-align: left;
+}
+
+#join-game-header {
+    white-space: nowrap;
+    display: flex;
+    justify-content: center;
 }
 
 /* Minesweeper menu */
