@@ -56,6 +56,36 @@
     height: 60px;
 }
 
+#leaderboard {
+    max-width: 325px;
+    height: 270px;
+    padding: 7px 10px;
+    margin: auto auto 5px;
+    display: grid;
+    grid-template-columns: 15% 35% 50%;
+    grid-auto-rows: min-content;
+    overflow-y: auto;
+}
+
+.leaderboard-left-h {
+    text-align: left;
+    font-weight: 600;
+}
+
+.leaderboard-right-h {
+    text-align: right;
+    font-weight: 600;
+}
+
+.leaderboard-left {
+    text-align: left;
+    color: var(--header-color);
+}
+
+.leaderboard-right {
+    text-align: right;
+}
+
 /* Create game menu */
 #create-window {
     max-width: 400px;
