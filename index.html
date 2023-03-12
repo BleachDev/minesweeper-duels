@@ -77,7 +77,8 @@
         <label for="username-create">Username</label>
         <input type="text" id="username-create" name="username-create">
 
-        <button onclick="newGame(getAndSaveUsername('username-create'));">Create Game</button>
+        <button id="create-game-button" onclick="document.getElementById('create-game-button').disabled = 'disabled';
+            newGame(getAndSaveUsername('username-create'));">Create Game</button>
         <div class="left-box">
             <button onclick="exitToMenu();"><-</button>
         </div>
@@ -238,7 +239,10 @@
                             "</span>&nbsp;vs&nbsp;<span style='color: var(--p2-color-light);'>" +
                             (data[7] ?? "<u>You!</u>") + "</span>";
 
-                        document.getElementById("join-game-button").onclick = () => joinGame(code, getAndSaveUsername("username-join"));
+                        document.getElementById("join-game-button").onclick = () => {
+                            document.getElementById("join-game-button").disabled = "disabled";
+                            joinGame(code, getAndSaveUsername("username-join"))
+                        };
                         if (data.length >= 8) {
                             document.getElementById("join-game-button").innerText = "Spectate Game";
                         }
@@ -651,6 +655,8 @@
             document.getElementById("player-name-1").innerText = "---";
             document.getElementById("player-name-2").innerText = "---";
             document.getElementById("rematch-button").disabled = "disabled";
+
+            document.getElementById('create-game-button').disabled = "";
 
             const path = window.location.protocol + "//" + window.location.host + window.location.pathname;
             window.history.pushState({ path: path }, '', path);
