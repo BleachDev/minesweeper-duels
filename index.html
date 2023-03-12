@@ -281,8 +281,8 @@
 
                             rematches.push(clIndex);
                             if (rematches.indexOf(0) !== -1 && rematches.indexOf(1) !== -1) {
-                                restartBoard("Rematching!\n", document.getElementById("mine-count").value,
-                                    document.getElementById("time").value, document.getElementById("increment").value);
+                                restartBoard("Rematching!\n", +document.getElementById("mine-count").value,
+                                    +document.getElementById("time").value, +document.getElementById("increment").value);
                             } else {
                                 for (const cl of clients) {
                                     cl.send([ 255, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch", -1, -1 ]);
@@ -300,7 +300,7 @@
 
                             clientCon.send([ 252,
                                 +document.getElementById("board-size").value, +document.getElementById("mine-count").value,
-                                +document.getElementById("time").value,  +document.getElementById("increment").value, clIndex ].concat(players));
+                                +document.getElementById("time").value, +document.getElementById("increment").value, clIndex ].concat(players));
                         } else if (data[0] === 255) {
                             if (clIndex > 1) {
                                 return;
