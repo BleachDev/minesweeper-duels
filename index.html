@@ -517,13 +517,13 @@
             }
 
             turnIndex = yourIndex ? 0 : 1;
-            updateTurn();
 
             const flags = getAdjacent(pos).filter(c => getCell(c).innerText === "F");
             const open = getAdjacent(pos).filter(c => field[c] >= 16 && flags.indexOf(c) === -1);
             if (flags.length === field[pos] & 15 && open.length > 0) {
                 for (const c of open) {
                     if (field[c] === 25) {
+                        turnIndex = yourIndex;
                         serverCon.send([ 255, "Detonated a bomb", c, yourIndex ]);
                         return;
                     } else {
@@ -531,6 +531,7 @@
                     }
                 }
 
+                updateTurn();
                 serverCon.send(field);
                 serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
             }
@@ -542,7 +543,6 @@
             }
 
             turnIndex = yourIndex ? 0 : 1;
-            updateTurn();
 
             if (!fieldGenerated) {
                 generateField(pos);
@@ -550,10 +550,12 @@
 
             clearInterval(timerFunc);
             if (field[pos] === 25) {
+                turnIndex = yourIndex;
                 serverCon.send([ 255, "Detonated a bomb", pos, yourIndex ]);
             } else {
                 revealInternal(pos, cell);
 
+                updateTurn();
                 serverCon.send(field);
                 serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
             }
