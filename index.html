@@ -383,6 +383,7 @@
                             }
 
                             updateTurn();
+                            console.log("RECEIVED", turnIndex, data);
                             synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", undefined, 0.3);
 
                             clearInterval(timerFunc);
@@ -410,7 +411,7 @@
                                 }, 70);
                             }
                         } else if (data[0] === 255) {
-                            endGame(data[1], data[2], data[3]);
+                            endGame(data[1], data[2]);
 
                             if (data[3] !== -1) {
                                 fetch("https://api.ms.bleach.dev/win?name=" + players[data[3] ? 0 : 1] + "&code=" + roomCode + "&type=" + (data[2] === -1 ? 1 : 0))
@@ -516,6 +517,7 @@
                 return;
             }
 
+            // Switch turn as soon as possible to prevent multiple cells from being clicked?
             turnIndex = yourIndex ? 0 : 1;
 
             const flags = getAdjacent(pos).filter(c => getCell(c).innerText === "F");
@@ -534,6 +536,8 @@
                 updateTurn();
                 serverCon.send(field);
                 serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
+            } else {
+                turnIndex = yourIndex;
             }
         }
 
@@ -542,6 +546,7 @@
                 return;
             }
 
+            // Switch turn as soon as possible to prevent multiple cells from being clicked?
             turnIndex = yourIndex ? 0 : 1;
 
             if (!fieldGenerated) {
@@ -609,7 +614,7 @@
             }
         }
 
-        function endGame(message, pos, losingPlayer) {
+        function endGame(message, pos) {
             if (pos >= 0 && pos < field.length) {
                 getCell(pos).style.backgroundColor = turnIndex ? "var(--p2-color)" : "var(--p1-color)";
                 synth.triggerAttackRelease("G2", "4n", undefined, 0.5);
