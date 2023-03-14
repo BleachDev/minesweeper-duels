@@ -179,11 +179,17 @@
         let players = [];
         let timers = [];
         let rematches = [];
-        let yourIndex;
+        let yourIndex = -1;
         let turnIndex = 0;
 
         let timerFunc;
         let timeIncrement;
+
+        window.onbeforeunload = () => {
+            if (serverCon) {
+                serverCon.close();
+            }
+        };
 
         // Init things
         fetch("https://api.ms.bleach.dev/leaderboard")
@@ -297,6 +303,10 @@
                                 console.log("Client Added To Game", clientCon);
                                 clIndex = clients.push(clientCon) - 1;
                                 players.push(data[1]);
+                                if (players.length === 2) {
+                                    document.getElementById("field-overlay").style.visibility = "hidden";
+                                }
+
                                 for (let i = 0; i < clients.length - 1; i++) {
                                     clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players))
                                 }
@@ -322,6 +332,25 @@
                             }
                         }
                     });
+                    clientCon.on('close', () => {
+                        console.log("DISCONNECT", clientCon);
+                        let clIndex = clients.indexOf(clientCon);
+                        if (clIndex >= 0/* && clIndex <= 1*/) {
+                            if (clIndex >= 2) {
+                                clients.splice(clIndex, 1);
+                                players.splice(clIndex, 1);
+                            } else {
+                                for (let i = 0; i < clients.length; i++) {
+                                    clients[i].send([ 255, `You Won!\n${players[clIndex]} Disconnected`, -1, -1 ]);
+                                }
+                                players[clIndex] = "(disconnected)";
+                            }
+
+                            for (let i = 0; i < clients.length; i++) {
+                                clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players))
+                            }
+                        }
+                    })
                 });
             });
             console.log(clientAcceptor);
@@ -364,16 +393,18 @@
 
                             document.getElementById("rules-text").innerText = `▦ ${fieldWidth}x${fieldHeight}\n✸ ${minePercentage}%\n⧖ ${formatTimeS(data[3])}\n⧖ +${timeIncrement}s`;
 
-                            yourIndex = data[5];
                             players = data.slice(6);
+                            if (yourIndex === -1 && players.length >= 2) {
+                                document.getElementById("field-overlay").style.visibility = "hidden";
+                            }
+                            yourIndex = data[5];
 
                             document.getElementById("player-name-1").innerText = players[0];
                             document.getElementById("player-name-2").innerText = players[1] ?? "---";
-                            if (players.length === 2) {
-                                document.getElementById("field-overlay").style.visibility = "hidden";
-                            }
                             if (players.length >= 3) {
                                 document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
+                            } else {
+                                document.getElementById("spectators-text").innerHTML = "";
                             }
                             updateTurn();
                         } else if (data[0] === 253) {
@@ -383,7 +414,6 @@
                             }
 
                             updateTurn();
-                            console.log("RECEIVED", turnIndex, data);
                             synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", undefined, 0.3);
 
                             clearInterval(timerFunc);
@@ -670,12 +700,16 @@
 
             clearInterval(timerFunc);
             timerFunc = undefined;
+            if (serverCon) {
+                serverCon.close();
+            }
+
             serverCon = undefined;
             clients = [];
             players = [];
             timers = [];
             rematches = [];
-            yourIndex = 0;
+            yourIndex = -1;
             turnIndex = 0;
         }
 
