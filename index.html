@@ -186,6 +186,9 @@
         let timeIncrement;
 
         window.onbeforeunload = () => {
+            if (clients.length > 0) {
+                onDisconnect(yourIndex);
+            }
             if (serverCon) {
                 serverCon.close();
             }
@@ -332,25 +335,7 @@
                             }
                         }
                     });
-                    clientCon.on('close', () => {
-                        console.log("DISCONNECT", clientCon);
-                        let clIndex = clients.indexOf(clientCon);
-                        if (clIndex >= 0/* && clIndex <= 1*/) {
-                            if (clIndex >= 2) {
-                                clients.splice(clIndex, 1);
-                                players.splice(clIndex, 1);
-                            } else {
-                                for (let i = 0; i < clients.length; i++) {
-                                    clients[i].send([ 255, `You Won!\n${players[clIndex]} Disconnected`, -1, -1 ]);
-                                }
-                                players[clIndex] = "(disconnected)";
-                            }
-
-                            for (let i = 0; i < clients.length; i++) {
-                                clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players))
-                            }
-                        }
-                    })
+                    clientCon.on('close', () => onDisconnect(clients.indexOf(clientCon)));
                 });
             });
             console.log(clientAcceptor);
@@ -700,6 +685,9 @@
 
             clearInterval(timerFunc);
             timerFunc = undefined;
+            if (clients.length > 0) {
+                onDisconnect(yourIndex);
+            }
             if (serverCon) {
                 serverCon.close();
             }
@@ -711,6 +699,24 @@
             rematches = [];
             yourIndex = -1;
             turnIndex = 0;
+        }
+
+        function onDisconnect(index) {
+            console.log("DISCONNECT", index);
+            if (index >= 2) {
+                clients.splice(index, 1);
+                players.splice(index, 1);
+            } else {
+                for (let i = 0; i < clients.length; i++) {
+                    console.log(players);
+                    clients[i].send([ 255, `You Won!\n${players[index]} Disconnected`, -1, -1 ]);
+                }
+                players[index] = "(disconnected)";
+            }
+
+            for (let i = 0; i < clients.length; i++) {
+                clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players));
+            }
         }
 
         function getCell(pos) {
