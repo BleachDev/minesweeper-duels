@@ -66,6 +66,10 @@
         <input type="range" id="mine-count" name="mine-count" min="5" max="30" value="15" list="mine-default">
         <datalist id="mine-default"><option value="15"></option></datalist>
 
+        <p class="setting-label" id="penalty-label">Mine Penalty:</p>
+        <input type="range" id="penalty" name="penalty" min="5" max="91" value="91" list="penalty-default">
+        <datalist id="penalty-default"><option value="91"></option></datalist>
+
         <p class="setting-label" id="time-label">Time:</p>
         <input type="range" id="time" name="time" min="2" max="300" value="60" step="2" list="time-default">
         <datalist id="time-default"><option value="60"></option></datalist>
@@ -89,10 +93,11 @@
         <div style="width: fit-content; margin: auto;">
             <p style="margin-bottom: 2px;">Rules:</p>
             <p id="join-rules-text">
-                <b>Board</b> ...<br>
-                <b>Mines</b> ...<br>
-                <b>Time</b> ...<br>
-                <b>Increment</b> ...<br>
+                <b>▦ Board</b> ...<br>
+                <b>✸ Mines</b> ...<br>
+                <b>✺ Penalty</b> ...<br>
+                <b>⧖ Time</b> ...<br>
+                <b>⧖ Increment</b> ...<br>
             </p>
         </div>
 
@@ -145,7 +150,8 @@
             <p class="bottom-left-text">Controls:<br>
                 <b>LMB</b> Reveal Square<br>
                 <b>RMB</b> Flag Square<br>
-                <b>MMB</b> <a href="https://minesweepergame.com/website/authoritative-minesweeper/wiki/Chord">Chord</a> Square</p>
+                <b>MMB</b> <a href="https://minesweepergame.com/website/authoritative-minesweeper/wiki/Chord">Chord</a> Square
+            </p>
         </div>
     </div>
 
@@ -156,11 +162,12 @@
         let fieldWidth;
         let fieldHeight;
         // Field ids:
-        // 0-8 = Opened Mines, 9 = Opened Bomb
+        // 0-8 = Opened Cell, 9 = Opened Mine
         // ID+16 = Unopened
         let field;
         let fieldGenerated = false;
         let minePercentage;
+        let minePenalty;
 
         // Networking things, Packets:
         // 0-220 >< Field update [cell1, cell2.. cellmax]
@@ -169,10 +176,10 @@
         //     < Start Rematch [251, 1]
         // 252 > Request Game Info [252]
         //     > Join Game [252, "username"]
-        //     < Game Info [252, boardSize, mineCount, time, increment, yourIndex, "player1", "player2"..]
+        //     < Game Info [252, boardSize, mineCount, penalty, time, increment, yourIndex, "player1", "player2"..]
         // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
-        // 255 > End game [255, "message", bombPos]
-        //     < Show message [255, "message", bombPos, losingPlayer]
+        // 255 > End game [255, "messageKey"]
+        //     < Show message [255, "message", losingPlayer]
         let serverCon;
         let clients = [];
 
@@ -215,13 +222,16 @@
         document.getElementById("mine-count").addEventListener("input", e => {
             document.getElementById('mine-label').innerText = `Mines: ${e.target.value}%`;
         });
+        document.getElementById("penalty").addEventListener("input", e => {
+            document.getElementById('penalty-label').innerText = `Mine Penalty: ${formatPenalty(+e.target.value)}`;
+        });
         document.getElementById("time").addEventListener("input", e => {
             document.getElementById('time-label').innerText = `Time: ${formatTimeS(e.target.value)}`;
         });
         document.getElementById("increment").addEventListener("input", e => {
             document.getElementById('increment-label').innerText = `Time Increment: +${e.target.value}s`;
         });
-        [ "board-size", "mine-count", "time", "increment" ].forEach(e => document.getElementById(e).dispatchEvent(new Event('input')));
+        [ "board-size", "mine-count", "penalty", "time", "increment" ].forEach(e => document.getElementById(e).dispatchEvent(new Event('input')));
 
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.has("code")) {
@@ -239,20 +249,21 @@
                         ruleText.innerHTML = ruleText.innerHTML
                             .replace("\.\.\.", `${~~(data[1] / 1.3)}x${data[1]}`)
                             .replace("\.\.\.", `${data[2]}%`)
-                            .replace("\.\.\.", formatTimeS(data[3]))
-                            .replace("\.\.\.", `+${data[4]}s`);
+                            .replace("\.\.\.", `${formatPenalty(data[3])}`)
+                            .replace("\.\.\.", formatTimeS(data[4]))
+                            .replace("\.\.\.", `+${data[5]}s`);
                         document.getElementById("join-game-button").disabled = "";
 
                         document.getElementById("join-game-header").innerHTML =
-                            "<span style='color: var(--p1-color-light);'>" + data[6] +
+                            "<span style='color: var(--p1-color-light);'>" + data[7] +
                             "</span>&nbsp;vs&nbsp;<span style='color: var(--p2-color-light);'>" +
-                            (data[7] ?? "<u>You!</u>") + "</span>";
+                            (data[8] ?? "<u>You!</u>") + "</span>";
 
                         document.getElementById("join-game-button").onclick = () => {
                             document.getElementById("join-game-button").disabled = "disabled";
                             joinGame(code, getAndSaveUsername("username-join"))
                         };
-                        if (data.length >= 8) {
+                        if (data.length >= 9) {
                             document.getElementById("join-game-button").innerText = "Spectate Game";
                         }
 
@@ -294,11 +305,12 @@
 
                             rematches.push(clIndex);
                             if (rematches.indexOf(0) !== -1 && rematches.indexOf(1) !== -1) {
-                                restartBoard("Rematching!\n", +document.getElementById("mine-count").value,
+                                restartBoard("Rematching!\n",
+                                    +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
                                     +document.getElementById("time").value, +document.getElementById("increment").value);
                             } else {
                                 for (const cl of clients) {
-                                    cl.send([ 255, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch", -1, -1 ]);
+                                    cl.send([ 255, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch", -1 ]);
                                 }
                             }
                         } else if (data[0] === 252) {
@@ -311,27 +323,29 @@
                                 }
 
                                 for (let i = 0; i < clients.length - 1; i++) {
-                                    clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players))
+                                    clients[i].send([ 252, -1, -1, -1, -1, -1, i ].concat(players))
                                 }
                             }
 
-                            clientCon.send([ 252,
-                                +document.getElementById("board-size").value, +document.getElementById("mine-count").value,
+                            clientCon.send([ 252, +document.getElementById("board-size").value,
+                                +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
                                 +document.getElementById("time").value, +document.getElementById("increment").value, clIndex ].concat(players));
                         } else if (data[0] === 255) {
                             if (clIndex > 1) {
                                 return;
                             }
 
-                            const newData = [ 255, `You Won!\n${players[clIndex]} ${data[1]}`, data[2], clIndex ];
-                            const altData = [ 255, `You Lost!\nYou ${data[1]}`, data[2], clIndex ];
+                            const newData = [ 255, `You Won!\n${players[clIndex]} ${data[1]}`, clIndex ];
+                            const altData = [ 255, `You Lost!\nYou ${data[1]}`, clIndex ];
                             for (const cl of clients) {
                                 cl.send(cl === clientCon ? altData : newData);
                                 cl.send([ 251 ]);
                             }
                         } else {
                             for (const cl of clients) {
-                                cl.send(data);
+                                if (!(data[0] < 250 && clients.indexOf(cl) !== clIndex)) {
+                                    cl.send(data);
+                                }
                             }
                         }
                     });
@@ -364,25 +378,32 @@
                                 fieldWidth = ~~(data[1] / 1.3);
                                 fieldHeight = data[1];
                                 minePercentage = data[2];
+                                minePenalty = data[3];
                                 document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
                                 createField();
                             }
 
-                            if (data[4] !== -1) {
-                                timeIncrement = data[4];
+                            if (data[5] !== -1) {
+                                timeIncrement = data[5];
                             }
-                            if (data[3] >= 0) {
-                                updateTimer(0, 1000 * data[3]);
-                                updateTimer(1, 1000 * data[3]);
+                            if (data[4] >= 0) {
+                                updateTimer(0, 1000 * data[4]);
+                                updateTimer(1, 1000 * data[4]);
                             }
 
-                            document.getElementById("rules-text").innerText = `▦ ${fieldWidth}x${fieldHeight}\n✸ ${minePercentage}%\n⧖ ${formatTimeS(data[3])}\n⧖ +${timeIncrement}s`;
+                            document.getElementById("rules-text").innerHTML = `
+                                   ▦ ${fieldWidth}x${fieldHeight}<br>
+                                   ✸ ${minePercentage}%<br>
+                                   ✺ ${formatPenalty(minePenalty)}<br>
+                                   ⧖ ${formatTimeS(data[3])}<br>
+                                   ⧖ +${timeIncrement}s`;
 
-                            players = data.slice(6);
+                            players = data.slice(7);
+                            console.log(players);
                             if (yourIndex === -1 && players.length >= 2) {
                                 document.getElementById("field-overlay").style.visibility = "hidden";
                             }
-                            yourIndex = data[5];
+                            yourIndex = data[6];
 
                             document.getElementById("player-name-1").innerText = players[0];
                             document.getElementById("player-name-2").innerText = players[1] ?? "---";
@@ -399,18 +420,32 @@
                             }
 
                             updateTurn();
-                            synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", undefined, 0.3);
+                            const hitMine = field[data[2]] === 9;
+                            if (hitMine) {
+                                getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
+                                synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
+                            } else {
+                                synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", Tone.now(), 0.3);
+                            }
 
                             clearInterval(timerFunc);
                             updateTimer(data[1], data[3]);
+                            if (document.getElementById("field-overlay").style.visibility !== "hidden") {
+                                return;
+                            }
+
                             // If every square in the field has been revealed
-                            if (field.filter(c => c <= 8 || c === 25).length === field.length) {
+                            if (field.filter(c => c <= 15 || c === 25).length === field.length) {
                                 if (clients.length !== 0) {
                                     const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.5 ? ~~((Math.random() + 0.35) * 3) : 0);
+                                    const newPenalty = Math.min(minePenalty + (Math.random() > 0.005 ? ~~((Math.random() + 0.25) * 5) : 0), 91);
                                     const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2 : 1), 0);
+
                                     const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
+                                    const newPenaltyText = minePenalty !== newPenalty ? `✺ ${formatPenalty(minePenalty)} -> ✺ ${formatPenalty(newPenalty)}\n` : "";
                                     const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement}s -> ⧖ +${newIncrement}s\n` : "";
-                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newIncrementText}`, newMines, -1, newIncrement);
+                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newPenaltyText}${newIncrementText}`,
+                                        newMines, newPenalty, -1, newIncrement);
                                 }
                             } else {
                                 let lastMs;
@@ -421,15 +456,16 @@
 
                                     if (timers[yourIndex] <= 0) {
                                         serverCon.send([ 253, yourIndex, -1, 0 ]);
-                                        serverCon.send([ 255, "Ran out of time", -1, yourIndex ]);
+                                        serverCon.send([ 255, "Ran out of time" ]);
                                     }
                                 }, 70);
                             }
                         } else if (data[0] === 255) {
                             endGame(data[1], data[2]);
 
-                            if (data[3] !== -1) {
-                                fetch("https://api.ms.bleach.dev/win?name=" + players[data[3] ? 0 : 1] + "&code=" + roomCode + "&type=" + (data[2] === -1 ? 1 : 0))
+                            const type = data[1].endsWith("time") ? 1 : data[1].endsWith("mine") ? 0 : -1;
+                            if (type !== -1) {
+                                fetch("https://api.ms.bleach.dev/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
                                     .then(r => r.ok);
                             }
                         } else {
@@ -455,20 +491,20 @@
             });
         }
 
-        function restartBoard(text, newMines, newTime, newIncrement) {
+        function restartBoard(text, newMines, newPenalty, newTime, newIncrement) {
             for (const cl of clients) {
-                cl.send([ 255, text, -1, -1 ]);
+                cl.send([ 255, text, -1 ]);
             }
 
             let countdown = 6;
             let countdownFunc = setInterval(() => {
                 if (countdown > 0) {
                     for (const cl of clients) {
-                        cl.send([ 255, text + "\n" + countdown + "..", -1, -1 ]);
+                        cl.send([ 255, text + "\n" + countdown + "..", -1 ]);
                     }
                 } else {
                     for (let i = 0; i < clients.length; i++) {
-                        clients[i].send([ 252, fieldHeight, newMines, newTime, newIncrement, i ].concat(players));
+                        clients[i].send([ 252, fieldHeight, newMines, newPenalty, newTime, newIncrement, i ].concat(players));
                         clients[i].send([ 251, 1 ]);
                     }
                     clearInterval(countdownFunc);
@@ -538,19 +574,18 @@
             const flags = getAdjacent(pos).filter(c => getCell(c).innerText === "F");
             const open = getAdjacent(pos).filter(c => field[c] >= 16 && flags.indexOf(c) === -1);
             if (flags.length === field[pos] & 15 && open.length > 0) {
+                let removeTime = false;
                 for (const c of open) {
-                    if (field[c] === 25) {
-                        turnIndex = yourIndex;
-                        serverCon.send([ 255, "Detonated a bomb", c, yourIndex ]);
-                        return;
-                    } else {
-                        revealInternal(c, getCell(c));
+                    revealInternal(c, getCell(c));
+                    if (field[c] === 9 && hitMine()) {
+                        removeTime = minePenalty !== 91;
+                        break;
                     }
                 }
 
                 updateTurn();
                 serverCon.send(field);
-                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
+                serverCon.send([ 253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000) ]);
             } else {
                 turnIndex = yourIndex;
             }
@@ -569,16 +604,16 @@
             }
 
             clearInterval(timerFunc);
-            if (field[pos] === 25) {
-                turnIndex = yourIndex;
-                serverCon.send([ 255, "Detonated a bomb", pos, yourIndex ]);
-            } else {
-                revealInternal(pos, cell);
+            revealInternal(pos, cell);
 
-                updateTurn();
-                serverCon.send(field);
-                serverCon.send([ 253, yourIndex, pos, timers[yourIndex] + (timeIncrement * 1000) ]);
+            serverCon.send(field);
+            let removeTime = false;
+            if (field[pos] === 9 && hitMine()) {
+                removeTime = minePenalty !== 91;
             }
+
+            updateTurn();
+            serverCon.send([253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000)]);
         }
 
         function revealInternal(pos, cell) {
@@ -625,19 +660,26 @@
 
         function giveUp() {
             if (document.getElementById("field-overlay").style.visibility === "hidden") {
-                serverCon.send([ 255, "Gave Up", -1, -1 /* Don't count as losing */ ]);
+                serverCon.send([ 255, "Gave Up" ]);
             }
         }
 
-        function endGame(message, pos) {
-            if (pos >= 0 && pos < field.length) {
-                getCell(pos).style.backgroundColor = turnIndex ? "var(--p2-color)" : "var(--p1-color)";
-                synth.triggerAttackRelease("G2", "4n", undefined, 0.5);
+        // Returns if the player lost
+        function hitMine() {
+            if (minePenalty === 91 || timers[yourIndex] - minePenalty * 1000 <= 0) {
+                turnIndex = yourIndex;
+                serverCon.send([ 255, "Detonated a mine" ]);
+                return true;
+            }
 
-                for (let i = 0; i < field.length; i++) {
-                    if (field[i] === 25) {
-                        revealInternal(i, getCell(i));
-                    }
+            updateTimer(yourIndex, timers[yourIndex] - minePenalty * 1000);
+            return false;
+        }
+
+        function endGame(message) {
+            for (let i = 0; i < field.length; i++) {
+                if (field[i] === 25) {
+                    revealInternal(i, getCell(i));
                 }
             }
 
@@ -651,8 +693,8 @@
                 return;
             }
 
-            if (player === yourIndex && timers[player] <= 3500 && (timers[player] % 200) < (ms % 200)) {
-                synth.triggerAttackRelease("A5", "32n", undefined, 0.05);
+            if (player === yourIndex && ms > 0 && timers[player] <= 3500 && (timers[player] % 200) < (ms % 200)) {
+                synth.triggerAttackRelease("A5", "32n", Tone.now(), 0.05);
             }
 
             document.getElementById(player ? "player-timer-2" : "player-timer-1").innerText = formatTime(ms);
@@ -668,6 +710,10 @@
 
         function formatTimeS(s) {
             return s < 0 ? "---" : ~~(s / 60) + ":" + (s % 60).toString().padStart(2, "0");
+        }
+
+        function formatPenalty(value) {
+            return value === 91 ? "Lose" : ("-" + value + "s");
         }
 
         function exitToMenu() {
@@ -702,6 +748,10 @@
         }
 
         function onDisconnect(index) {
+            if (index < 0) {
+                return;
+            }
+
             console.log("DISCONNECT", index);
             if (index >= 2) {
                 clients.splice(index, 1);
@@ -709,13 +759,13 @@
             } else {
                 for (let i = 0; i < clients.length; i++) {
                     console.log(players);
-                    clients[i].send([ 255, `You Won!\n${players[index]} Disconnected`, -1, -1 ]);
+                    clients[i].send([ 255, `You Won!\n${players[index]} Disconnected`, -1 ]);
                 }
                 players[index] = "(disconnected)";
             }
 
             for (let i = 0; i < clients.length; i++) {
-                clients[i].send([ 252, -1, -1, -1, -1, i ].concat(players));
+                clients[i].send([ 252, -1, -1, -1, -1, -1, i ].concat(players));
             }
         }
 

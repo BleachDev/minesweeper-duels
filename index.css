@@ -148,7 +148,7 @@ input[type="range"] {
 
 #rules-text {
     color: #bbb;
-    top: calc(100% - 100px);
+    top: calc(100% - 125px);
 }
 
 #spectators-text {
