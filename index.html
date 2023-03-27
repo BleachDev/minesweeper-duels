@@ -438,7 +438,7 @@
                             if (field.filter(c => c <= 15 || c === 25).length === field.length) {
                                 if (clients.length !== 0) {
                                     const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.5 ? ~~((Math.random() + 0.35) * 3) : 0);
-                                    const newPenalty = Math.min(minePenalty + (Math.random() > 0.005 ? ~~((Math.random() + 0.25) * 5) : 0), 91);
+                                    const newPenalty = Math.min(minePenalty + (Math.random() > 0.5 ? ~~((Math.random() + 0.25) * 5) : 0), 91);
                                     const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2 : 1), 0);
 
                                     const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
