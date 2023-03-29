@@ -420,7 +420,7 @@
                             }
 
                             updateTurn();
-                            const hitMine = field[data[2]] === 9;
+                            const hitMine = field[data[2]] === 9 || field[data[2]] === 25;
                             if (hitMine) {
                                 getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
                                 synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
