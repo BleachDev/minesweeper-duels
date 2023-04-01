@@ -170,7 +170,8 @@
         let minePenalty;
 
         // Networking things, Packets:
-        // 0-220 >< Field update [cell1, cell2.. cellmax]
+        // 0-250 > Field update [cell1, cell2.. cellmax]
+        //       < Field update [fromPlayer, cell1, cell2.. cellmax]
         // 251 < Open Rematches [251]
         //     > Request Rematch [251]
         //     < Start Rematch [251, 1]
@@ -178,7 +179,7 @@
         //     > Join Game [252, "username"]
         //     < Game Info [252, boardSize, mineCount, penalty, time, increment, yourIndex, "player1", "player2"..]
         // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
-        // 255 > End game [255, "messageKey"]
+        // 255 > End game [255, "message"]
         //     < Show message [255, "message", losingPlayer]
         let serverCon;
         let clients = [];
@@ -330,6 +331,10 @@
                             clientCon.send([ 252, +document.getElementById("board-size").value,
                                 +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
                                 +document.getElementById("time").value, +document.getElementById("increment").value, clIndex ].concat(players));
+                        } else if (data[0] === 253) {
+                            for (const cl of clients) {
+                                cl.send(data);
+                            }
                         } else if (data[0] === 255) {
                             if (clIndex > 1) {
                                 return;
@@ -342,9 +347,11 @@
                                 cl.send([ 251 ]);
                             }
                         } else {
+                            const returnData = [ clIndex ].concat(Array.from(new Uint8Array(data)));
+                            console.log(returnData);
                             for (const cl of clients) {
-                                if (!(data[0] < 250 && clients.indexOf(cl) !== clIndex)) {
-                                    cl.send(data);
+                                if (clients.indexOf(cl) !== clIndex) {
+                                    cl.send(returnData);
                                 }
                             }
                         }
@@ -420,13 +427,6 @@
                             }
 
                             updateTurn();
-                            const hitMine = field[data[2]] === 9 || field[data[2]] === 25;
-                            if (hitMine) {
-                                getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
-                                synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
-                            } else {
-                                synth.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", Tone.now(), 0.3);
-                            }
 
                             clearInterval(timerFunc);
                             updateTimer(data[1], data[3]);
@@ -469,12 +469,20 @@
                                     .then(r => r.ok);
                             }
                         } else {
-                            field = new Uint8Array(data);
+                            field = new Uint8Array(data.slice(1));
                             fieldGenerated = true;
+
+                            let hitMine = false;
                             for (let i = 0; i < field.length; i++) {
                                 if (field[i] <= 15) {
-                                    revealInternal(i, getCell(i));
+                                    hitMine |= revealInternal(data[0], i, getCell(i));
                                 }
+                            }
+
+                            if (hitMine) {
+                                synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
+                            } else {
+                                synth.triggerAttackRelease("C4", "16n", Tone.now(), 0.3);
                             }
                         }
                     });
@@ -576,10 +584,11 @@
             if (flags.length === field[pos] & 15 && open.length > 0) {
                 let removeTime = false;
                 for (const c of open) {
-                    revealInternal(c, getCell(c));
-                    if (field[c] === 9 && hitMine()) {
-                        removeTime = minePenalty !== 91;
-                        break;
+                    if (revealInternal(yourIndex, c, getCell(c))) {
+                        synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
+                        removeTime = applyMinePenalty() && minePenalty !== 91;
+                    } else {
+                        synth.triggerAttackRelease("E4", "16n", Tone.now(), 0.3);
                     }
                 }
 
@@ -604,27 +613,31 @@
             }
 
             clearInterval(timerFunc);
-            revealInternal(pos, cell);
 
-            serverCon.send(field);
             let removeTime = false;
-            if (field[pos] === 9 && hitMine()) {
-                removeTime = minePenalty !== 91;
+            if (revealInternal(yourIndex, pos, cell)) {
+                synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
+                removeTime = applyMinePenalty() && minePenalty !== 91;
+            } else {
+                synth.triggerAttackRelease("E4", "16n", Tone.now(), 0.3);
             }
 
             updateTurn();
+            serverCon.send(field);
             serverCon.send([253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000)]);
         }
 
-        function revealInternal(pos, cell) {
-            if (cell.className === "revealed") {
-                return;
-            }
-
+        // Returns if a mine was detonated
+        function revealInternal(fromPlayer, pos, cell) {
+            const revealed = cell.className.startsWith("revealed");
             cell.className = "revealed";
             cell.onclick = () => false;
             cell.oncontextmenu = () => false;
             cell.onauxclick = () => chord(pos, cell);
+
+            if (revealed) {
+                return false;
+            }
 
             const nearby = field[pos] & 15;
             field[pos] = nearby;
@@ -634,16 +647,21 @@
             } else if (nearby === 9) {
                 cell.innerText = "✸";
                 cell.style.color = `#000`;
+                if (fromPlayer !== -1) {
+                    cell.style.backgroundColor = fromPlayer ? "var(--p2-color)" : "var(--p1-color)";
+                    return true;
+                }
             }
 
             if (nearby === 0) {
                 for (const c of getAdjacent(pos)) {
                     const newCell = getCell(c);
                     if (newCell.className === "hidden") {
-                        revealInternal(c, newCell);
+                        revealInternal(fromPlayer, c, newCell);
                     }
                 }
             }
+            return false;
         }
 
         function updateTurn() {
@@ -665,7 +683,7 @@
         }
 
         // Returns if the player lost
-        function hitMine() {
+        function applyMinePenalty() {
             if (minePenalty === 91 || timers[yourIndex] - minePenalty * 1000 <= 0) {
                 turnIndex = yourIndex;
                 serverCon.send([ 255, "Detonated a mine" ]);
@@ -679,7 +697,7 @@
         function endGame(message) {
             for (let i = 0; i < field.length; i++) {
                 if (field[i] === 25) {
-                    revealInternal(i, getCell(i));
+                    revealInternal(-1, i, getCell(i));
                 }
             }
 
@@ -693,7 +711,7 @@
                 return;
             }
 
-            if (player === yourIndex && ms > 0 && timers[player] <= 3500 && (timers[player] % 200) < (ms % 200)) {
+            if (player === yourIndex && timers[player] <= 3500 && (timers[player] % 200) < (ms % 200)) {
                 synth.triggerAttackRelease("A5", "32n", Tone.now(), 0.05);
             }
 
