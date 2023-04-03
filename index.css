@@ -13,6 +13,7 @@
     top: 100%;
     left: 100%;
     transform: translate(-100%, -100%);
+    text-align: right;
 }
 
 .bottom-left {
@@ -21,10 +22,10 @@
     top: 100%;
     left: 0;
     transform: translate(0, -100%);
+    text-align: left;
 }
 
-.bottom-left-text {
-    text-align: left;
+.corner-text {
     margin: 0;
     color: #bbb;
 }
