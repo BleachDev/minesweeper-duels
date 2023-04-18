@@ -146,7 +146,7 @@
                 <img src="https://bleach.dev/static/img/logos/github.svg" alt="Github" width="32"/>
             </a>
             <p class="corner-text">
-                v1.4.2<br>
+                v1.4.3<br>
                 A&nbsp;<a href="https://bleach.dev" class="bleach-link">bleach.dev</a>&nbsp;Game
             </p>
         </div>
@@ -182,7 +182,7 @@
         // 252 > Request Game Info [252]
         //     > Join Game [252, "username"]
         //     < Game Info [252, boardSize, mineCount, penalty, time, increment, yourIndex, "player1", "player2"..]
-        // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs]
+        // 253 >< Switch Turn [253, fromPlayer, clickedPos, clickedMs, hitMine]
         // 255 > End game [255, "messageKey"]
         //     < Show message [255, "message", losingPlayer]
         let serverCon;
@@ -425,8 +425,7 @@
                             }
 
                             updateTurn();
-                            const hitMine = field[data[2]] === 9 || field[data[2]] === 25;
-                            if (hitMine) {
+                            if (data[4]) {
                                 getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
                                 synth.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
                             } else {
@@ -580,9 +579,11 @@
             const open = getAdjacent(pos).filter(c => field[c] >= 16 && flags.indexOf(c) === -1);
             if (flags.length === field[pos] & 15 && open.length > 0) {
                 let removeTime = false;
+                let mineHit = false;
                 for (const c of open) {
                     revealInternal(c, getCell(c));
                     if (field[c] === 9 && hitMine()) {
+                        mineHit = true;
                         removeTime = minePenalty !== 91;
                         break;
                     }
@@ -590,7 +591,7 @@
 
                 updateTurn();
                 serverCon.send(field);
-                serverCon.send([ 253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000) ]);
+                serverCon.send([ 253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000), mineHit ]);
             } else {
                 turnIndex = yourIndex;
             }
@@ -613,12 +614,14 @@
 
             serverCon.send(field);
             let removeTime = false;
+            let mineHit = false;
             if (field[pos] === 9 && hitMine()) {
+                mineHit = true;
                 removeTime = minePenalty !== 91;
             }
 
             updateTurn();
-            serverCon.send([253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000)]);
+            serverCon.send([253, yourIndex, pos, removeTime ? 0 : timers[yourIndex] + (timeIncrement * 1000), mineHit]);
         }
 
         function revealInternal(pos, cell) {
