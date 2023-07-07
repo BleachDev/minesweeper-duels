@@ -59,8 +59,8 @@
         <h1>Create New Game</h1>
 
         <p class="setting-label" id="board-label">Board Size:</p>
-        <input type="range" id="board-size" name="board-size" min="12" max="35" value="16" list="board-default">
-        <datalist id="board-default"><option value="16"></option></datalist>
+        <input type="range" id="board-size" name="board-size" min="12" max="35" value="18" list="board-default">
+        <datalist id="board-default"><option value="18"></option></datalist>
 
         <p class="setting-label" id="mine-label">Mines:</p>
         <input type="range" id="mine-count" name="mine-count" min="5" max="30" value="15" list="mine-default">
@@ -175,7 +175,7 @@
         let minePenalty;
 
         // Networking things, Packets:
-        // 0-220 >< Field update [cell1, cell2.. cellmax]
+        // 0-250 >< Field update [cell1, cell2.. cellmax]
         // 251 < Open Rematches [251]
         //     > Request Rematch [251]
         //     < Start Rematch [251, 1]
