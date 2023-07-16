@@ -207,7 +207,7 @@
         };
 
         // Init things
-        fetch("https://api.ms.bleach.dev/leaderboard")
+        fetch("https://api.bleach.dev/ms/leaderboard")
             .then(r => r.json())
             .then(d => {
                 let i = 1;
@@ -469,7 +469,7 @@
 
                             const type = data[1].endsWith("time") ? 1 : data[1].endsWith("mine") ? 0 : -1;
                             if (type !== -1) {
-                                fetch("https://api.ms.bleach.dev/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
+                                fetch("https://api.bleach.dev/ms/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
                                     .then(r => r.ok);
                             }
                         } else {
