@@ -194,7 +194,7 @@
         let timerFunc;
         let timeIncrement;
 
-        let peerConfigPromise = fetch("https://api.bleach.dev/turn").then(r => r.json(), _ => {});
+        let iceServerPromise = fetch("https://api.bleach.dev/turn").then(r => r.json()).catch(_ => null);
 
         window.onbeforeunload = () => {
             if (clients.length > 0) {
@@ -812,8 +812,8 @@
         }
 
         async function createPeer(id) {
-            const config = await peerConfigPromise;
-            return new peerjs.Peer(id, { config: config });
+            const iceServer = await iceServerPromise;
+            return new peerjs.Peer(id, iceServer ? { config: { iceServers: iceServer } } : null);
         }
     </script>
 </body>
