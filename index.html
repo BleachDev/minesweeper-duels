@@ -194,6 +194,8 @@
         let timerFunc;
         let timeIncrement;
 
+        let peerConfigPromise = fetch("https://api.bleach.dev/turn").then(r => r.json(), _ => {});
+
         window.onbeforeunload = () => {
             if (clients.length > 0) {
                 onDisconnect(yourIndex);
@@ -247,38 +249,39 @@
             const code = urlParams.get("code");
             openWindow("join-window");
 
-            const metadataPeer = createPeer();
-            metadataPeer.on('open', id => {
-                console.log('Client peer ID is: ' + id);
+            createPeer().then(metadataPeer => {
+                metadataPeer.on('open', id => {
+                    console.log('Client peer ID is: ' + id);
 
-                const metadataCon = metadataPeer.connect("msduel-" + code);
-                metadataCon.on('open', () => {
-                    metadataCon.on('data', data => {
-                        const ruleText = document.getElementById("join-rules-text");
-                        ruleText.innerHTML = ruleText.innerHTML
-                            .replace("\.\.\.", `${~~(data[1] / 1.3)}x${data[1]}`)
-                            .replace("\.\.\.", `${data[2]}%`)
-                            .replace("\.\.\.", `${formatPenalty(data[3])}`)
-                            .replace("\.\.\.", formatTimeS(data[4]))
-                            .replace("\.\.\.", `+${data[5]}s`);
-                        document.getElementById("join-game-button").disabled = "";
+                    const metadataCon = metadataPeer.connect("msduel-" + code);
+                    metadataCon.on('open', () => {
+                        metadataCon.on('data', data => {
+                            const ruleText = document.getElementById("join-rules-text");
+                            ruleText.innerHTML = ruleText.innerHTML
+                                .replace("\.\.\.", `${~~(data[1] / 1.3)}x${data[1]}`)
+                                .replace("\.\.\.", `${data[2]}%`)
+                                .replace("\.\.\.", `${formatPenalty(data[3])}`)
+                                .replace("\.\.\.", formatTimeS(data[4]))
+                                .replace("\.\.\.", `+${data[5]}s`);
+                            document.getElementById("join-game-button").disabled = "";
 
-                        document.getElementById("join-game-header").innerHTML =
-                            "<span style='color: var(--p1-color-light);'>" + data[7] +
-                            "</span>&nbsp;vs&nbsp;<span style='color: var(--p2-color-light);'>" +
-                            (data[8] ?? "<u>You!</u>") + "</span>";
+                            document.getElementById("join-game-header").innerHTML =
+                                "<span style='color: var(--p1-color-light);'>" + data[7] +
+                                "</span>&nbsp;vs&nbsp;<span style='color: var(--p2-color-light);'>" +
+                                (data[8] ?? "<u>You!</u>") + "</span>";
 
-                        document.getElementById("join-game-button").onclick = () => {
-                            document.getElementById("join-game-button").disabled = "disabled";
-                            joinGame(code, getAndSaveUsername("username-join"))
-                        };
-                        if (data.length >= 9) {
-                            document.getElementById("join-game-button").innerText = "Spectate Game";
-                        }
+                            document.getElementById("join-game-button").onclick = () => {
+                                document.getElementById("join-game-button").disabled = "disabled";
+                                joinGame(code, getAndSaveUsername("username-join"))
+                            };
+                            if (data.length >= 9) {
+                                document.getElementById("join-game-button").innerText = "Spectate Game";
+                            }
 
-                        metadataPeer.destroy();
+                            metadataPeer.destroy();
+                        });
+                        metadataCon.send([ 252 ]);
                     });
-                    metadataCon.send([ 252 ]);
                 });
             });
         }
@@ -297,204 +300,206 @@
                 roomCode += characters.charAt(~~(Math.random() * characters.length));
             }
 
-            let clientAcceptor = createPeer("msduel-" + roomCode);
-            clientAcceptor.on('open', id => {
-                console.log('Server peer ID is: ' + id);
+            createPeer("msduel-" + roomCode).then(clientAcceptor => {
+                clientAcceptor.on('open', id => {
+                    console.log('Server peer ID is: ' + id);
 
-                clientAcceptor.on('connection', clientCon => {
-                    console.log("Client Accepted", clientCon);
+                    clientAcceptor.on('connection', clientCon => {
+                        console.log("Client Accepted", clientCon);
 
-                    clientCon.on('data', data => {
-                        console.log("Server Received", data);
-                        let clIndex = clients.indexOf(clientCon);
-                        if (data[0] === 251) {
-                            if (rematches.indexOf(clIndex) !== -1) {
-                                return;
-                            }
+                        clientCon.on('data', data => {
+                            console.log("Server Received", data);
+                            let clIndex = clients.indexOf(clientCon);
+                            if (data[0] === 251) {
+                                if (rematches.indexOf(clIndex) !== -1) {
+                                    return;
+                                }
 
-                            rematches.push(clIndex);
-                            if (rematches.indexOf(0) !== -1 && rematches.indexOf(1) !== -1) {
-                                restartBoard("Rematching!\n",
+                                rematches.push(clIndex);
+                                if (rematches.indexOf(0) !== -1 && rematches.indexOf(1) !== -1) {
+                                    restartBoard("Rematching!\n",
+                                        +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
+                                        +document.getElementById("time").value, +document.getElementById("increment").value);
+                                } else {
+                                    for (const cl of clients) {
+                                        cl.send([ 255, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch", -1 ]);
+                                    }
+                                }
+                            } else if (data[0] === 252) {
+                                if (data.length >= 2 && clIndex === -1) {
+                                    console.log("Client Added To Game", clientCon);
+                                    clIndex = clients.push(clientCon) - 1;
+                                    players.push(data[1]);
+                                    if (players.length === 2) {
+                                        document.getElementById("field-overlay").style.visibility = "hidden";
+                                    }
+
+                                    for (let i = 0; i < clients.length - 1; i++) {
+                                        clients[i].send([ 252, -1, -1, -1, -1, -1, i ].concat(players))
+                                    }
+                                }
+
+                                clientCon.send([ 252, +document.getElementById("board-size").value,
                                     +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
-                                    +document.getElementById("time").value, +document.getElementById("increment").value);
+                                    +document.getElementById("time").value, +document.getElementById("increment").value, clIndex ].concat(players));
+                            } else if (data[0] === 255) {
+                                if (clIndex > 1) {
+                                    return;
+                                }
+
+                                const newData = [ 255, `You Won!\n${players[clIndex]} ${data[1]}`, clIndex ];
+                                const altData = [ 255, `You Lost!\nYou ${data[1]}`, clIndex ];
+                                for (const cl of clients) {
+                                    cl.send(cl === clientCon ? altData : newData);
+                                    cl.send([ 251 ]);
+                                }
                             } else {
                                 for (const cl of clients) {
-                                    cl.send([ 255, document.getElementById("overlay-message").innerText + "\n\n" + players[clIndex] + " Wants a rematch", -1 ]);
+                                    if (!(data[0] < 250 && clients.indexOf(cl) !== clIndex)) {
+                                        cl.send(data);
+                                    }
                                 }
                             }
-                        } else if (data[0] === 252) {
-                            if (data.length >= 2 && clIndex === -1) {
-                                console.log("Client Added To Game", clientCon);
-                                clIndex = clients.push(clientCon) - 1;
-                                players.push(data[1]);
-                                if (players.length === 2) {
-                                    document.getElementById("field-overlay").style.visibility = "hidden";
-                                }
-
-                                for (let i = 0; i < clients.length - 1; i++) {
-                                    clients[i].send([ 252, -1, -1, -1, -1, -1, i ].concat(players))
-                                }
-                            }
-
-                            clientCon.send([ 252, +document.getElementById("board-size").value,
-                                +document.getElementById("mine-count").value, +document.getElementById("penalty").value,
-                                +document.getElementById("time").value, +document.getElementById("increment").value, clIndex ].concat(players));
-                        } else if (data[0] === 255) {
-                            if (clIndex > 1) {
-                                return;
-                            }
-
-                            const newData = [ 255, `You Won!\n${players[clIndex]} ${data[1]}`, clIndex ];
-                            const altData = [ 255, `You Lost!\nYou ${data[1]}`, clIndex ];
-                            for (const cl of clients) {
-                                cl.send(cl === clientCon ? altData : newData);
-                                cl.send([ 251 ]);
-                            }
-                        } else {
-                            for (const cl of clients) {
-                                if (!(data[0] < 250 && clients.indexOf(cl) !== clIndex)) {
-                                    cl.send(data);
-                                }
-                            }
-                        }
+                        });
+                        clientCon.on('close', () => onDisconnect(clients.indexOf(clientCon)));
                     });
-                    clientCon.on('close', () => onDisconnect(clients.indexOf(clientCon)));
                 });
+                console.log(clientAcceptor);
             });
-            console.log(clientAcceptor);
 
             joinGame(roomCode, username);
         }
 
         function joinGame(roomCode, username) {
-            const toServerPeer = createPeer();
-            toServerPeer.on('open', id => {
-                console.log('Client peer ID is: ' + id);
+            createPeer().then(toServerPeer => {
+                toServerPeer.on('open', id => {
+                    console.log('Client peer ID is: ' + id);
 
-                serverCon = toServerPeer.connect("msduel-" + roomCode);
-                serverCon.on('open', () => {
-                    serverCon.on('data', data => {
-                        console.log("Client Received", data);
-                        if (data[0] === 251) {
-                            document.getElementById("rematch-button").disabled = "";
-                            if (data[1] === 1) {
-                                document.getElementById("field-overlay").style.visibility = "hidden";
-                                document.getElementById("rematch-button").disabled = "disabled";
-                                rematches = [];
-                            }
-                        } else if (data[0] === 252) {
-                            if (data[1] >= 0 && data[2] >= 0) {
-                                fieldWidth = ~~(data[1] / 1.3);
-                                fieldHeight = data[1];
-                                minePercentage = data[2];
-                                minePenalty = data[3];
-                                document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
-                                createField();
-                            }
+                    serverCon = toServerPeer.connect("msduel-" + roomCode);
+                    serverCon.on('open', () => {
+                        serverCon.on('data', data => {
+                            console.log("Client Received", data);
+                            if (data[0] === 251) {
+                                document.getElementById("rematch-button").disabled = "";
+                                if (data[1] === 1) {
+                                    document.getElementById("field-overlay").style.visibility = "hidden";
+                                    document.getElementById("rematch-button").disabled = "disabled";
+                                    rematches = [];
+                                }
+                            } else if (data[0] === 252) {
+                                if (data[1] >= 0 && data[2] >= 0) {
+                                    fieldWidth = ~~(data[1] / 1.3);
+                                    fieldHeight = data[1];
+                                    minePercentage = data[2];
+                                    minePenalty = data[3];
+                                    document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
+                                    createField();
+                                }
 
-                            if (data[5] !== -1) {
-                                timeIncrement = data[5];
-                            }
-                            if (data[4] >= 0) {
-                                updateTimer(0, 1000 * data[4]);
-                                updateTimer(1, 1000 * data[4]);
-                            }
+                                if (data[5] !== -1) {
+                                    timeIncrement = data[5];
+                                }
+                                if (data[4] >= 0) {
+                                    updateTimer(0, 1000 * data[4]);
+                                    updateTimer(1, 1000 * data[4]);
+                                }
 
-                            document.getElementById("rules-text").innerHTML = `
+                                document.getElementById("rules-text").innerHTML = `
                                    ▦ ${fieldWidth}x${fieldHeight}<br>
                                    ✸ ${minePercentage}%<br>
                                    ✺ ${formatPenalty(minePenalty)}<br>
                                    ⧖ ${formatTimeS(data[4])}<br>
                                    ⧖ +${timeIncrement}s`;
 
-                            players = data.slice(7);
-                            console.log(players);
-                            if (yourIndex === -1 && players.length >= 2) {
-                                document.getElementById("field-overlay").style.visibility = "hidden";
-                            }
-                            yourIndex = data[6];
-
-                            document.getElementById("player-name-1").innerText = players[0];
-                            document.getElementById("player-name-2").innerText = players[1] ?? "---";
-                            if (players.length >= 3) {
-                                document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
-                            } else {
-                                document.getElementById("spectators-text").innerHTML = "";
-                            }
-                            updateTurn();
-                        } else if (data[0] === 253) {
-                            turnIndex = data[1] ? 0 : 1;
-                            if (data[2] >= 0) {
-                                getCell(data[2]).className = data[1] ? "revealed-p2" : "revealed-p1";
-                            }
-
-                            updateTurn();
-                            if (data[4]) {
-                                getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
-                                SYNTH.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
-                            } else {
-                                SYNTH.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", Tone.now(), 0.3);
-                            }
-
-                            clearInterval(timerFunc);
-                            updateTimer(data[1], data[3]);
-                            if (document.getElementById("field-overlay").style.visibility !== "hidden") {
-                                return;
-                            }
-
-                            // If every square in the field has been revealed
-                            if (field.filter(c => c <= 15 || c === 25).length === field.length) {
-                                if (clients.length !== 0) {
-                                    const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.5 ? ~~((Math.random() + 0.35) * 3) : 0);
-                                    const newPenalty = Math.min(minePenalty + (Math.random() > 0.5 ? ~~((Math.random() + 0.25) * 5) : 0), 91);
-                                    const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2 : 1), 0);
-
-                                    const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
-                                    const newPenaltyText = minePenalty !== newPenalty ? `✺ ${formatPenalty(minePenalty)} -> ✺ ${formatPenalty(newPenalty)}\n` : "";
-                                    const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement}s -> ⧖ +${newIncrement}s\n` : "";
-                                    restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newPenaltyText}${newIncrementText}`,
-                                        newMines, newPenalty, -1, newIncrement);
+                                players = data.slice(7);
+                                console.log(players);
+                                if (yourIndex === -1 && players.length >= 2) {
+                                    document.getElementById("field-overlay").style.visibility = "hidden";
                                 }
-                            } else {
-                                let lastMs;
-                                timerFunc = setInterval(() => {
-                                    const now = Date.now();
-                                    updateTimer(turnIndex, timers[turnIndex] - (now - (lastMs ?? now)));
-                                    lastMs = now;
+                                yourIndex = data[6];
 
-                                    if (timers[yourIndex] <= 0) {
-                                        serverCon.send([ 253, yourIndex, -1, 0 ]);
-                                        serverCon.send([ 255, "Ran out of time" ]);
+                                document.getElementById("player-name-1").innerText = players[0];
+                                document.getElementById("player-name-2").innerText = players[1] ?? "---";
+                                if (players.length >= 3) {
+                                    document.getElementById("spectators-text").innerHTML = "<b>Spectators</b><br>" + players.slice(2).join("<br>");
+                                } else {
+                                    document.getElementById("spectators-text").innerHTML = "";
+                                }
+                                updateTurn();
+                            } else if (data[0] === 253) {
+                                turnIndex = data[1] ? 0 : 1;
+                                if (data[2] >= 0) {
+                                    getCell(data[2]).className = data[1] ? "revealed-p2" : "revealed-p1";
+                                }
+
+                                updateTurn();
+                                if (data[4]) {
+                                    getCell(data[2]).style.backgroundColor = data[1] ? "var(--p2-color)" : "var(--p1-color)";
+                                    SYNTH.triggerAttackRelease("G2", "6n", Tone.now(), 0.75);
+                                } else {
+                                    SYNTH.triggerAttackRelease(turnIndex === yourIndex ? "C4" : "E4", "16n", Tone.now(), 0.3);
+                                }
+
+                                clearInterval(timerFunc);
+                                updateTimer(data[1], data[3]);
+                                if (document.getElementById("field-overlay").style.visibility !== "hidden") {
+                                    return;
+                                }
+
+                                // If every square in the field has been revealed
+                                if (field.filter(c => c <= 15 || c === 25).length === field.length) {
+                                    if (clients.length !== 0) {
+                                        const newMines = minePercentage + (timeIncrement === 0 || Math.random() > 0.5 ? ~~((Math.random() + 0.35) * 3) : 0);
+                                        const newPenalty = Math.min(minePenalty + (Math.random() > 0.5 ? ~~((Math.random() + 0.25) * 5) : 0), 91);
+                                        const newIncrement = Math.max(timeIncrement - (Math.random() > 0.75 ? 2 : 1), 0);
+
+                                        const newMineText = minePercentage !== newMines ? `✸ ${minePercentage}% -> ✸ ${newMines}%\n` : "";
+                                        const newPenaltyText = minePenalty !== newPenalty ? `✺ ${formatPenalty(minePenalty)} -> ✺ ${formatPenalty(newPenalty)}\n` : "";
+                                        const newIncrementText = timeIncrement !== newIncrement ? `⧖ +${timeIncrement}s -> ⧖ +${newIncrement}s\n` : "";
+                                        restartBoard(`Board Finished!\nIncreasing difficulty\n\n${newMineText}${newPenaltyText}${newIncrementText}`,
+                                            newMines, newPenalty, -1, newIncrement);
                                     }
-                                }, 70);
-                            }
-                        } else if (data[0] === 255) {
-                            endGame(data[1], data[2]);
+                                } else {
+                                    let lastMs;
+                                    timerFunc = setInterval(() => {
+                                        const now = Date.now();
+                                        updateTimer(turnIndex, timers[turnIndex] - (now - (lastMs ?? now)));
+                                        lastMs = now;
 
-                            const type = data[1].endsWith("time") ? 1 : data[1].endsWith("mine") ? 0 : -1;
-                            if (type !== -1) {
-                                fetch("https://api.bleach.dev/ms/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
-                                    .then(r => r.ok);
-                            }
-                        } else {
-                            field = new Uint8Array(data);
-                            fieldGenerated = true;
-                            for (let i = 0; i < field.length; i++) {
-                                if (field[i] <= 15) {
-                                    revealInternal(i, getCell(i));
+                                        if (timers[yourIndex] <= 0) {
+                                            serverCon.send([ 253, yourIndex, -1, 0 ]);
+                                            serverCon.send([ 255, "Ran out of time" ]);
+                                        }
+                                    }, 70);
+                                }
+                            } else if (data[0] === 255) {
+                                endGame(data[1], data[2]);
+
+                                const type = data[1].endsWith("time") ? 1 : data[1].endsWith("mine") ? 0 : -1;
+                                if (type !== -1) {
+                                    fetch("https://api.bleach.dev/ms/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
+                                        .then(r => r.ok);
+                                }
+                            } else {
+                                field = new Uint8Array(data);
+                                fieldGenerated = true;
+                                for (let i = 0; i < field.length; i++) {
+                                    if (field[i] <= 15) {
+                                        revealInternal(i, getCell(i));
+                                    }
                                 }
                             }
-                        }
+                        });
+
+                        console.log("Connected to server!");
+                        const path = window.location.protocol + "//" + window.location.host + window.location.pathname + "?code=" + roomCode;
+                        window.history.pushState({ path: path }, '', path);
+
+                        document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
+                        document.getElementById("spectators-text").innerHTML = "";
+
+                        serverCon.send([ 252, username ]);
                     });
-
-                    console.log("Connected to server!");
-                    const path = window.location.protocol + "//" + window.location.host + window.location.pathname + "?code=" + roomCode;
-                    window.history.pushState({ path: path }, '', path);
-
-                    document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
-                    document.getElementById("spectators-text").innerHTML = "";
-
-                    serverCon.send([ 252, username ]);
                 });
             });
         }
@@ -806,11 +811,9 @@
             return name;
         }
 
-        let peerConfig = {};
-        fetch("https://api.bleach.dev/turn").then(r => r.json()).then(j => peerConfig.iceServers = j);
-
-        function createPeer(id) {
-            return new peerjs.Peer(id, { config: peerConfig });
+        async function createPeer(id) {
+            const config = await peerConfigPromise;
+            return new peerjs.Peer(id, { config: config });
         }
     </script>
 </body>
