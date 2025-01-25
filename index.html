@@ -143,7 +143,7 @@
                 <img src="https://tetris.bleach.dev/static/source.svg" alt="Source code" width="32"/>
             </a>
             <p class="corner-text">
-                v1.4.4<br>
+                v1.4.5<br>
                 A&nbsp;<a href="https://bleach.dev" class="bleach-link">bleach.dev</a>&nbsp;Game
             </p>
         </div>
@@ -247,7 +247,7 @@
             const code = urlParams.get("code");
             openWindow("join-window");
 
-            const metadataPeer = new peerjs.Peer();
+            const metadataPeer = createPeer();
             metadataPeer.on('open', id => {
                 console.log('Client peer ID is: ' + id);
 
@@ -297,7 +297,7 @@
                 roomCode += characters.charAt(~~(Math.random() * characters.length));
             }
 
-            let clientAcceptor = new peerjs.Peer("msduel-" + roomCode);
+            let clientAcceptor = createPeer("msduel-" + roomCode);
             clientAcceptor.on('open', id => {
                 console.log('Server peer ID is: ' + id);
 
@@ -367,7 +367,7 @@
         }
 
         function joinGame(roomCode, username) {
-            const toServerPeer = new peerjs.Peer();
+            const toServerPeer = createPeer();
             toServerPeer.on('open', id => {
                 console.log('Client peer ID is: ' + id);
 
@@ -804,6 +804,13 @@
             const name = document.getElementById(id).value;
             document.cookie = "username=" + name + "; max-age=2592000";
             return name;
+        }
+
+        let peerConfig = {};
+        fetch("https://api.bleach.dev/turn").then(r => r.json()).then(j => peerConfig.iceServers = j);
+
+        function createPeer(id) {
+            return new peerjs.Peer(id, { config: peerConfig });
         }
     </script>
 </body>
