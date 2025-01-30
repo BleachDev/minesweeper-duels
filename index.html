@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="https://bleach.dev/static/css/main.css">
     <link rel="stylesheet" href="index.css">
 
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
     <script src="words.js"></script>
 </head>
@@ -34,8 +34,8 @@
             <button class="new-game" onclick="openWindow('create-window');">New Game</button>
 
             <p style="font-size: 18px; margin: 15px 0 0 0;">Or Join a Game</p>
-            <div class="box join-box">
-                <p>Public games coming soon<br>Searching..</p>
+            <div class="box join-box" id="join-box">
+                <p>Searching for public games...</p>
             </div>
 
             <label for="username">Username</label>
@@ -143,7 +143,7 @@
                 <img src="https://tetris.bleach.dev/static/source.svg" alt="Source code" width="32"/>
             </a>
             <p class="corner-text">
-                v1.4.5<br>
+                v1.5.0<br>
                 A&nbsp;<a href="https://bleach.dev" class="bleach-link">bleach.dev</a>&nbsp;Game
             </p>
         </div>
@@ -193,6 +193,8 @@
 
         let timerFunc;
         let timeIncrement;
+
+        let pingFunc;
 
         let iceServerPromise = fetch("https://api.bleach.dev/turn").then(r => r.json()).catch(_ => null);
 
@@ -286,12 +288,35 @@
             });
         }
 
-
         const username = document.cookie.split("; ").find(row => row.startsWith("username="))?.split("=")[1]
             ?? words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
         [ "username", "username-create", "username-join" ].forEach(u => {
             document.getElementById(u).value = username;
         });
+
+        fetch("https://api.bleach.dev/ms/publicgames").then(r => r.json().then(json => {
+            const joinNode = document.getElementById("join-box");
+            joinNode.innerHTML = json.length === 0 ? "<p>No public games found :(</p>" : "";
+
+            let i = 0;
+            for (const game of json) {
+                joinNode.innerHTML += `
+                    <a id="join-button-${i}" style="text-decoration: none"><div class="join-button">
+                        <p style="padding-top: 8px;">vs</p>
+                        <span class='join-text-top-left' id='join-tl-${i}'></span>
+                        <span class='join-text-top-right' id='join-tr-${i}'></span>
+                        <span class='join-text-bottom-left' id='join-bl-${i}'></span>
+                        <span class='join-text-bottom-right' id='join-br-${i}'></span>
+                    </div></a>
+                `;
+                document.getElementById("join-button-" + i).href = window.location.href + "?code=" + game.code;
+                document.getElementById("join-tl-" + i).innerText = game.names[0];
+                document.getElementById("join-tr-" + i).innerText = game.names[1] ?? "You!";
+                document.getElementById("join-bl-" + i).innerText = game.code;
+                document.getElementById("join-br-" + i).innerText = game.boardSize + " " + game.mines + "\n" + game.time + " " + game.increment;
+                i++;
+            }
+        }));
 
         function newGame(username) {
             let roomCode = "";
@@ -377,6 +402,8 @@
 
                     serverCon = toServerPeer.connect("msduel-" + roomCode);
                     serverCon.on('open', () => {
+                        let originalTime = 0;
+
                         serverCon.on('data', data => {
                             console.log("Client Received", data);
                             if (data[0] === 251) {
@@ -392,6 +419,7 @@
                                     fieldHeight = data[1];
                                     minePercentage = data[2];
                                     minePenalty = data[3];
+                                    originalTime = data[4];
                                     document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
                                     createField();
                                 }
@@ -408,7 +436,7 @@
                                    ▦ ${fieldWidth}x${fieldHeight}<br>
                                    ✸ ${minePercentage}%<br>
                                    ✺ ${formatPenalty(minePenalty)}<br>
-                                   ⧖ ${formatTimeS(data[4])}<br>
+                                   ⧖ ${formatTimeS(originalTime)}<br>
                                    ⧖ +${timeIncrement}s`;
 
                                 players = data.slice(7);
@@ -497,6 +525,12 @@
 
                         document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
                         document.getElementById("spectators-text").innerHTML = "";
+
+                        pingFunc = intervalNow(() => {
+                            const url = `https://api.bleach.dev/ms/ping?code=${roomCode}&name=${encodeURI(username)}&bs=${fieldWidth}x${fieldHeight}&m=${minePercentage}%25&p=${formatPenalty(minePenalty)}&t=${formatTimeS(originalTime)}&i=%2B${timeIncrement}s`;
+                            fetch(url);
+                            console.log("ping " + url)
+                        }, 10000, 1000);
 
                         serverCon.send([ 252, username ]);
                     });
@@ -747,7 +781,9 @@
             window.history.pushState({ path: path }, '', path);
 
             clearInterval(timerFunc);
+            clearInterval(pingFunc);
             timerFunc = undefined;
+            pingFunc = undefined;
             if (clients.length > 0) {
                 onDisconnect(yourIndex);
             }
@@ -784,6 +820,8 @@
             for (let i = 0; i < clients.length; i++) {
                 clients[i].send([ 252, -1, -1, -1, -1, -1, i ].concat(players));
             }
+
+            clearInterval(pingFunc);
         }
 
         function getCell(pos) {
@@ -814,6 +852,11 @@
         async function createPeer(id) {
             const iceServer = await iceServerPromise;
             return new peerjs.Peer(id, iceServer ? { config: { iceServers: iceServer } } : null);
+        }
+
+        function intervalNow(func, timeout, delay) {
+            setTimeout(func, delay);
+            return setInterval(func, timeout);
         }
     </script>
 </body>

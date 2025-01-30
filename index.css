@@ -51,12 +51,61 @@
     width: 90%;
     height: 300px;
     margin: 10px auto;
-    display: grid;
     overflow-y: auto;
 }
 
 .join-button {
-    height: 60px;
+    position: relative;
+    height: 80px;
+    border-radius: 10px;
+    margin: 15px 6px;
+    outline: 2px dashed #bbb;
+    transition-duration: 0.4s;
+    cursor: pointer;
+}
+
+.join-button:hover {
+    outline: 2px dashed var(--link-hover-color);
+}
+
+.join-text-top-left {
+    color: var(--p1-color);
+    width: 43%;
+    word-wrap: break-word;
+    font-size: 18px;
+    text-align: left;
+    position: absolute;
+    top: 4px;
+    left: 12px;
+}
+
+.join-text-top-right {
+    color: var(--p2-color);
+    width: 43%;
+    word-wrap: break-word;
+    font-size: 18px;
+    text-align: right;
+    position: absolute;
+    top: 4px;
+    right: 12px;
+ }
+
+.join-text-bottom-left {
+    color: var(--header-color);
+    font-size: 20px;
+    font-weight: bolder;
+    text-align: left;
+    position: absolute;
+    bottom: 4px;
+    left: 10px;
+}
+
+.join-text-bottom-right {
+    color: #bbb;
+    text-align: right;
+    position: absolute;
+    bottom: 4px;
+    right: 10px;
 }
 
 #leaderboard {
