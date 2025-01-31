@@ -38,18 +38,13 @@
                 <p>Searching for public games...</p>
             </div>
 
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username">
+            <details>
+                <summary style="margin: 0 0 5px 20px; text-align: left">Leaderboard</summary>
+                <div class="box" id="leaderboard">
+                    <div>Loading..</div>
+                </div>
+            </details>
         </div>
-
-        <div style="height: 10px;"></div>
-
-        <details>
-            <summary style="margin-bottom: 5px;">Leaderboard</summary>
-            <div class="box" id="leaderboard">
-                <div>Loading..</div>
-            </div>
-        </details>
     </div>
 
     <div class="box" id="create-window">
@@ -290,7 +285,7 @@
 
         const username = document.cookie.split("; ").find(row => row.startsWith("username="))?.split("=")[1]
             ?? words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
-        [ "username", "username-create", "username-join" ].forEach(u => {
+        [ "username-create", "username-join" ].forEach(u => {
             document.getElementById(u).value = username;
         });
 

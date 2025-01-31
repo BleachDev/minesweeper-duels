@@ -56,16 +56,17 @@
 
 .join-button {
     position: relative;
+    background-color: #00000050;
     height: 80px;
     border-radius: 10px;
     margin: 15px 6px;
-    outline: 2px dashed #bbb;
     transition-duration: 0.4s;
+    outline: 1px solid black;
     cursor: pointer;
 }
 
 .join-button:hover {
-    outline: 2px dashed var(--link-hover-color);
+    outline: 5px solid var(--link-hover-color);
 }
 
 .join-text-top-left {
