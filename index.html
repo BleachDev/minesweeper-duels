@@ -38,6 +38,8 @@
                 <p>Searching for public games...</p>
             </div>
 
+            <span id="userstats-text">🏆- ✸- ⧖-</span>
+
             <details>
                 <summary style="margin: 0 0 5px 20px; text-align: left">Leaderboard</summary>
                 <div class="box" id="leaderboard">
@@ -138,7 +140,7 @@
                 <img src="https://tetris.bleach.dev/static/source.svg" alt="Source code" width="32"/>
             </a>
             <p class="corner-text">
-                v1.5.0<br>
+                v1.5.1<br>
                 A&nbsp;<a href="https://bleach.dev" class="bleach-link">bleach.dev</a>&nbsp;Game
             </p>
         </div>
@@ -167,7 +169,7 @@
         let minePenalty;
 
         // Networking things, Packets:
-        // 0-250 >< Field update [cell1, cell2.. cellmax]
+        // 0-250 >< Field update [cell1, cell2... cellmax]
         // 251 < Open Rematches [251]
         //     > Request Rematch [251]
         //     < Start Rematch [251, 1]
@@ -283,11 +285,14 @@
             });
         }
 
-        const username = document.cookie.split("; ").find(row => row.startsWith("username="))?.split("=")[1]
-            ?? words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
+        const username = getCookie("username") ?? words[~~(Math.random() * (words.length - 1))] + (Math.random() > 0.5 ? ~~(Math.random() * 100) : "");
         [ "username-create", "username-join" ].forEach(u => {
             document.getElementById(u).value = username;
         });
+
+        const statBombWins = ~~getCookie("bombWins") ?? 0;
+        const statTimeWins = ~~getCookie("timeWins") ?? 0;
+        document.getElementById("userstats-text").innerText = `🏆${statBombWins+statTimeWins} ✸${statBombWins} ⧖${statTimeWins}`;
 
         fetch("https://api.bleach.dev/ms/publicgames").then(r => r.json().then(json => {
             const joinNode = document.getElementById("join-box");
@@ -500,8 +505,10 @@
 
                                 const type = data[1].endsWith("time") ? 1 : data[1].endsWith("mine") ? 0 : -1;
                                 if (type !== -1) {
-                                    fetch("https://api.bleach.dev/ms/win?name=" + players[data[2] ? 0 : 1] + "&code=" + roomCode + "&type=" + type)
+                                    fetch("https://api.bleach.dev/ms/win?name=" + encodeURIComponent(players[data[2] ? 0 : 1]) + "&code=" + roomCode + "&type=" + type)
                                         .then(r => r.ok);
+                                    const c = getCookie(type === 1 ? "timeWins" : "bombWins") ?? 0;
+                                    setCookie(type === 1 ? "timeWins" : "bombWins", c + 1);
                                 }
                             } else {
                                 field = new Uint8Array(data);
@@ -840,8 +847,23 @@
 
         function getAndSaveUsername(id) {
             const name = document.getElementById(id).value;
-            document.cookie = "username=" + name + "; max-age=2592000";
+            setCookie("username", name);
             return name;
+        }
+
+        function setCookie(name, value) {
+            document.cookie = name + "=" + (value.toString().replace(";", "") || "") + "; max-age=2592000";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
         }
 
         async function createPeer(id) {

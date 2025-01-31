@@ -109,6 +109,14 @@
     right: 10px;
 }
 
+#userstats-text {
+    float: right;
+    margin-right: 20px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    color: var(--header-color);
+}
+
 #leaderboard {
     max-width: 350px;
     height: 270px;
