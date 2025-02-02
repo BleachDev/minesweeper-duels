@@ -388,6 +388,12 @@
                         });
                         clientCon.on('close', () => onDisconnect(clients.indexOf(clientCon)));
                     });
+
+                    pingFunc = intervalNow(() => {
+                        const url = `https://api.bleach.dev/ms/ping?code=${roomCode}&names=${encodeURI(players.map(p => p.replace(";", "")).join(";"))}&bs=${fieldWidth}x${fieldHeight}&m=${minePercentage}%25&p=${formatPenalty(minePenalty)}&t=${formatTimeS(+document.getElementById("time").value)}&i=%2B${timeIncrement}s`;
+                        fetch(url);
+                        console.log("ping " + url);
+                    }, 10000, 1000);
                 });
                 console.log(clientAcceptor);
             });
@@ -402,8 +408,6 @@
 
                     serverCon = toServerPeer.connect("msduel-" + roomCode);
                     serverCon.on('open', () => {
-                        let originalTime = 0;
-
                         serverCon.on('data', data => {
                             console.log("Client Received", data);
                             if (data[0] === 251) {
@@ -419,7 +423,6 @@
                                     fieldHeight = data[1];
                                     minePercentage = data[2];
                                     minePenalty = data[3];
-                                    originalTime = data[4];
                                     document.getElementById("overlay-message").style.fontSize = fieldHeight >= 14 ? "20px" : "16px";
                                     createField();
                                 }
@@ -436,7 +439,7 @@
                                    ▦ ${fieldWidth}x${fieldHeight}<br>
                                    ✸ ${minePercentage}%<br>
                                    ✺ ${formatPenalty(minePenalty)}<br>
-                                   ⧖ ${formatTimeS(originalTime)}<br>
+                                   ⧖ ${formatTimeS(data[4])}<br>
                                    ⧖ +${timeIncrement}s`;
 
                                 players = data.slice(7);
@@ -527,12 +530,6 @@
 
                         document.getElementById("overlay-message").innerText = "Waiting for player to join\nms.bleach.dev/?code=" + roomCode;
                         document.getElementById("spectators-text").innerHTML = "";
-
-                        pingFunc = intervalNow(() => {
-                            const url = `https://api.bleach.dev/ms/ping?code=${roomCode}&name=${encodeURI(username)}&bs=${fieldWidth}x${fieldHeight}&m=${minePercentage}%25&p=${formatPenalty(minePenalty)}&t=${formatTimeS(originalTime)}&i=%2B${timeIncrement}s`;
-                            fetch(url);
-                            console.log("ping " + url)
-                        }, 10000, 1000);
 
                         serverCon.send([ 252, username ]);
                     });
