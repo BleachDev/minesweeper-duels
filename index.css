@@ -147,6 +147,17 @@
     text-align: right;
 }
 
+#tetris-text {
+    float: right;
+    margin-top: 8px;
+    opacity: 0.5;
+    transition-duration: 0.4s;
+}
+
+#tetris-text:hover {
+    opacity: 1;
+}
+
 /* Create game menu */
 #create-window {
     max-width: 400px;
